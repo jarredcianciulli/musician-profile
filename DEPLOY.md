@@ -17,7 +17,7 @@ Workers (contact + studio-api) stay on **Cloudflare Workers** — deploy separat
 | `REACT_APP_CONTACT_ENDPOINT` | Contact worker URL |
 | `REACT_APP_STUDIO_API` | Studio/booking API base |
 | `REACT_APP_LAB_URL` | Link to Lab |
-| `REACT_APP_SCALES_URL` | Link to Scales |
+| `REACT_APP_METHOD_URL` | Link to Method |
 | `REACT_APP_STUDIO_EMAIL` | Public email |
 
 Seed on Pi: `cp env.production.example ~/bss/studio/prod/.env`
@@ -34,7 +34,7 @@ Deploy dirs: `~/bss/studio/{prod|staging}`
 | batterystringstudio.com | 8087 | musician-profile |
 | staging.batterystringstudio.com | 8088 | musician-profile |
 | lab.batterystringstudio.com | 8089 | battery-string-lab |
-| scales.batterystringstudio.com | 8093 | battery-string-scales |
+| method.batterystringstudio.com | 8093 | battery-string-scales |
 
 Caddy: `ograno_dev/deploy/caddy/Caddyfile.bss-routes`
 

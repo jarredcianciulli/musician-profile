@@ -15,8 +15,8 @@ Create **CNAME** (or tunnel-managed) records, proxied (orange cloud):
 | `staging` | same tunnel |
 | `lab` | same tunnel |
 | `lab-staging` | same tunnel |
-| `scales` | same tunnel |
-| `scales-staging` | same tunnel |
+| `method` | same tunnel |
+| `method-staging` | same tunnel |
 | `api` | *(optional)* Workers custom domain — see §4 |
 
 SSL/TLS mode: **Flexible** (matches Organo/ChooseYou: HTTPS at Cloudflare, HTTP to Caddy).
@@ -34,8 +34,8 @@ In Zero Trust → Networks → Tunnels → your Pi tunnel → Public Hostname:
 | `staging.batterystringstudio.com` | `http://127.0.0.1:80` |
 | `lab.batterystringstudio.com` | `http://127.0.0.1:80` |
 | `lab-staging.batterystringstudio.com` | `http://127.0.0.1:80` |
-| `scales.batterystringstudio.com` | `http://127.0.0.1:80` |
-| `scales-staging.batterystringstudio.com` | `http://127.0.0.1:80` |
+| `method.batterystringstudio.com` | `http://127.0.0.1:80` |
+| `method-staging.batterystringstudio.com` | `http://127.0.0.1:80` |
 
 All go to **Caddy on :80**. Caddy picks the app by `Host` header (`Caddyfile.bss-routes`).
 
@@ -73,7 +73,7 @@ REACT_APP_CONTACT_ENDPOINT=https://api.batterystringstudio.com/contact
 REACT_APP_STUDIO_API=https://api.batterystringstudio.com
 REACT_APP_WEBSITE_DOMAIN=https://batterystringstudio.com
 REACT_APP_LAB_URL=https://lab.batterystringstudio.com
-REACT_APP_SCALES_URL=https://scales.batterystringstudio.com
+REACT_APP_METHOD_URL=https://method.batterystringstudio.com
 ```
 
 Redeploy the studio site after changing `.env` (`docker compose up -d --build` in `~/bss/studio/prod`).

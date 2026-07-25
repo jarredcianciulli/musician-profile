@@ -16,8 +16,8 @@ export const brand = {
   website: websiteUrl.replace(/^https?:\/\//, ""),
   websiteUrl,
   labUrl: process.env.REACT_APP_LAB_URL || "https://lab.batterystringstudio.com",
-  scalesUrl:
-    process.env.REACT_APP_SCALES_URL || "https://scales.batterystringstudio.com",
+  methodUrl:
+    process.env.REACT_APP_METHOD_URL || "https://method.batterystringstudio.com",
 };
 
 /** Sky lock — black + #9DB7D4 */
