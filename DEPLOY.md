@@ -34,7 +34,7 @@ Deploy dirs: `~/bss/studio/{prod|staging}`
 | batterystringstudio.com | 8087 | musician-profile |
 | staging.batterystringstudio.com | 8088 | musician-profile |
 | lab.batterystringstudio.com | 8089 | battery-string-lab |
-| scales.batterystringstudio.com | 8090 | battery-string-scales |
+| scales.batterystringstudio.com | 8093 | battery-string-scales |
 
 Caddy: `ograno_dev/deploy/caddy/Caddyfile.bss-routes`
 
