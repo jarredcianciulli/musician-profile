@@ -57,5 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           cd "$DEPLOY_DIR"
+          NAME=$(awk '/container_name:/{print $2; exit}' docker-compose.yml || true)
+          if [ -n "${NAME:-}" ]; then docker rm -f "$NAME" 2>/dev/null || true; fi
           docker compose --env-file .env up -d --build --force-recreate --remove-orphans
           docker compose ps
