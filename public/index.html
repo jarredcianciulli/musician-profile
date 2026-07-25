@@ -2,14 +2,147 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.svg" type="image/svg+xml" />
+    <link rel="alternate icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#1B2A3A" />
     <meta
       name="description"
-      content="Web site created using create-react-app"
+      content="Professional violin and viola instruction in Charleston, SC. Conservatory-trained teacher offering private lessons for all ages and skill levels."
     />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+
+    <!-- Open Graph / Social Media Preview -->
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:title"
+      content="Battery String Studio - Violin & Viola Instruction"
+    />
+    <meta
+      property="og:description"
+      content="Professional violin and viola instruction in Charleston, SC. Conservatory-trained teacher offering private lessons for all ages and skill levels."
+    />
+    <meta
+      property="og:image"
+      content="%PUBLIC_URL%/intono-logo-icon-dark.png"
+    />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary" />
+    <meta
+      name="twitter:title"
+      content="Battery String Studio - Violin & Viola Instruction"
+    />
+    <meta
+      name="twitter:description"
+      content="Professional violin and viola instruction in Charleston, SC."
+    />
+
+    <!-- Additional SEO -->
+    <meta
+      name="keywords"
+      content="violin lessons, viola lessons, Charleston SC, Hanahan, music lessons, string instruments, conservatory trained, classical music, private lessons, violin teacher, viola teacher, violin instructor near me, viola instructor Charleston"
+    />
+    <meta name="author" content="Jarred Cianciulli" />
+    <meta name="robots" content="index, follow" />
+    <meta name="geo.region" content="US-SC" />
+    <meta name="geo.placename" content="Hanahan, Charleston" />
+    <meta name="geo.position" content="32.9182;-80.0042" />
+    <meta name="ICBM" content="32.9182, -80.0042" />
+    <link rel="canonical" href="https://batterystringstudio.com/" />
+
+    <!-- Preconnect to external resources for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://www.googletagmanager.com" />
+
+    <!-- Structured Data for Local Business -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "MusicSchool",
+        "name": "Battery String Studio - Violin & Viola Instruction",
+        "description": "Professional violin and viola instruction in Charleston, SC. Conservatory-trained teacher offering private lessons for all ages and skill levels.",
+        "url": "https://batterystringstudio.com",
+        "telephone": "(610) 340-8827",
+        "email": "hello@batterystringstudio.com",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Hanahan",
+          "addressRegion": "SC",
+          "addressCountry": "US"
+        },
+        "areaServed": {
+          "@type": "City",
+          "name": "Charleston"
+        },
+        "priceRange": "$$",
+        "availableService": [
+          {
+            "@type": "Service",
+            "name": "Private Violin Lessons",
+            "description": "One-on-one violin instruction for all ages and skill levels"
+          },
+          {
+            "@type": "Service",
+            "name": "Private Viola Lessons",
+            "description": "One-on-one viola instruction for all ages and skill levels"
+          }
+        ],
+        "founder": {
+          "@type": "Person",
+          "name": "Jarred Cianciulli",
+          "jobTitle": "Music Instructor",
+          "description": "Conservatory-trained professional violist and violin instructor"
+        }
+      }
+    </script>
+
+    <!-- FAQ Schema for Voice Search -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Where are violin lessons in Charleston SC?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Jarred Cianciulli offers violin and viola lessons in Hanahan, SC, serving the greater Charleston area. Conservatory-trained with professional performance experience."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Who teaches viola lessons near me in Charleston?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Jarred Cianciulli is a conservatory-trained professional violist offering private viola lessons in Hanahan, SC for all ages and skill levels."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How much are violin lessons in Charleston SC?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Contact Jarred Cianciulli for current lesson rates. Professional violin and viola instruction in Hanahan, SC with flexible scheduling options."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What ages do you teach violin and viola?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Jarred Cianciulli teaches violin and viola to students of all ages and skill levels, from complete beginners to advanced players."
+            }
+          }
+        ]
+      }
+    </script>
+
+    <link
+      rel="apple-touch-icon"
+      href="%PUBLIC_URL%/apple-touch-icon.png"
+    />
     <!--
       manifest.json provides metadata used when your web app is installed on a
       user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
@@ -24,7 +157,23 @@
       work correctly both with client-side routing and a non-root public URL.
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
-    <title>React App</title>
+    <title>
+      Battery String Studio - Violin & Viola Instruction | Charleston, SC
+    </title>
+
+    <!-- Google tag (gtag.js) -->
+    <script
+      async
+      src="https://www.googletagmanager.com/gtag/js?id=G-KEQW07QHKW"
+    ></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag("js", new Date());
+      gtag("config", "G-KEQW07QHKW");
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

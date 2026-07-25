@@ -1,0 +1,94 @@
+<svg viewBox="0 0 800 1200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .ink { fill:#14171C; }
+      .paper { fill:#F4EFE6; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="800" height="1200" class="ink"/>
+
+  <!-- Eyebrow -->
+  <text x="60" y="96" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700" letter-spacing="10" fill="#D9432E">FALL 2026 · NOW ENROLLING</text>
+  <line x1="60" y1="118" x2="740" y2="118" stroke="#D9432E" stroke-width="2"/>
+
+  <!-- HERO: hand-drawn violin, single confident vermillion line -->
+  <g transform="translate(400,455)" stroke="#D9432E" fill="none" stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- Scroll (top) -->
+    <path d="M -6,-292
+             C -30,-296 -46,-312 -44,-334
+             C -43,-350 -28,-362 -10,-360
+             C 8,-358 18,-344 14,-330
+             C 11,-319 -1,-314 -9,-320
+             C -15,-324 -13,-333 -6,-333
+             C -1,-333 2,-328 -1,-324" stroke-width="4"/>
+    <!-- pegbox + two pegs -->
+    <path d="M -6,-292 C -14,-300 -14,-320 -8,-334" stroke-width="4"/>
+    <line x1="-40" y1="-330" x2="-14" y2="-326" stroke-width="4.5"/>
+    <line x1="-40" y1="-312" x2="-12" y2="-310" stroke-width="4.5"/>
+
+    <!-- Neck + fingerboard -->
+    <path d="M -12,-292 L -14,-150" stroke-width="4"/>
+    <path d="M 12,-292 L 14,-150" stroke-width="4"/>
+    <line x1="0" y1="-334" x2="0" y2="-150" stroke-width="1" opacity="0.6"/>
+
+    <!-- Body: symmetric violin silhouette drawn as one flowing outline -->
+    <path d="M 0,-150
+             C 44,-150 66,-132 70,-104
+             C 73,-82 64,-70 66,-58
+             C 92,-46 108,-20 108,12
+             C 108,64 70,150 0,150
+             C -70,150 -108,64 -108,12
+             C -108,-20 -92,-46 -66,-58
+             C -64,-70 -73,-82 -70,-104
+             C -66,-132 -44,-150 0,-150 Z" stroke-width="4.5"/>
+
+    <!-- corners hint (C-bout points) -->
+    <path d="M -66,-58 C -74,-56 -80,-50 -82,-42" stroke-width="2.5"/>
+    <path d="M 66,-58 C 74,-56 80,-50 82,-42" stroke-width="2.5"/>
+    <path d="M -70,66 C -78,68 -84,74 -86,82" stroke-width="2.5"/>
+    <path d="M 70,66 C 78,68 84,74 86,82" stroke-width="2.5"/>
+
+    <!-- f-holes -->
+    <path d="M -34,-30
+             C -44,-16 -42,28 -30,50
+             M -38,10 L -26,10" stroke-width="3"/>
+    <path d="M 34,-30
+             C 44,-16 42,28 30,50
+             M 38,10 L 26,10" stroke-width="3"/>
+
+    <!-- bridge -->
+    <path d="M -24,66 C -14,54 14,54 24,66" stroke-width="3"/>
+
+    <!-- strings -->
+    <line x1="-5" y1="-334" x2="-5" y2="104" stroke-width="0.9"/>
+    <line x1="5" y1="-334" x2="5" y2="104" stroke-width="0.9"/>
+
+    <!-- tailpiece -->
+    <path d="M -14,104 L 14,104 L 8,136 L -8,136 Z" stroke-width="2.5"/>
+
+    <!-- bow, crossing behind at an angle -->
+    <line x1="150" y1="-120" x2="-40" y2="180" stroke-width="3" opacity="0.85"/>
+    <line x1="150" y1="-120" x2="158" y2="-108" stroke-width="3" opacity="0.85"/>
+    <line x1="-40" y1="180" x2="-30" y2="188" stroke-width="3" opacity="0.85"/>
+  </g>
+
+  <!-- Wordmark row: mark inline with text -->
+  <g transform="translate(60,940)">
+    <g transform="translate(0,-38) scale(0.9)">
+      <path d="M40,20 C52,40 16,50 30,74 C44,98 8,108 26,128" fill="none" stroke="#D9432E" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="40" cy="16" r="5.5" fill="#D9432E"/>
+      <circle cx="26" cy="132" r="5.5" fill="#D9432E"/>
+      <line x1="18" y1="66" x2="43" y2="78" stroke="#D9432E" stroke-width="5" stroke-linecap="round"/>
+    </g>
+    <text x="72" y="0" font-family="Georgia, 'Times New Roman', serif" font-size="52" font-weight="700" letter-spacing="1" class="paper">BATTERY STRING</text>
+    <text x="74" y="42" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="600" letter-spacing="14" fill="#D9432E">STUDIO</text>
+  </g>
+
+  <line x1="60" y1="1058" x2="740" y2="1058" stroke="#D9432E" stroke-width="2"/>
+  <text x="60" y="1096" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-size="26" class="paper">Violin &amp; Viola — Private Instruction</text>
+  <text x="60" y="1130" font-family="Arial, Helvetica, sans-serif" font-size="18" letter-spacing="1" class="paper">Charleston, SC   ·   batterystringstudio.com   ·   Book a free intro lesson</text>
+
+  <text x="400" y="1172" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" class="paper" opacity="0.45">Concept draft</text>
+</svg>

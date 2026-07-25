@@ -1,13 +1,80 @@
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap");
+
+/*
+  Sky brand lock (matches poster people scan before visiting).
+*/
+:root {
+  --color-ink: #0a0a0a;
+  --color-ink-soft: #1a1a1c;
+  --color-paper: #f4f6f8;
+  --color-paper-muted: #e8eef4;
+  --color-sky: #9db7d4;
+  --color-sky-deep: #7a9bbf;
+  --color-gold: #9db7d4;
+  --color-gold-deep: #7a9bbf;
+  --color-accent: #0a0a0a;
+  --color-accent-hover: #1a1a1c;
+  --color-line: #c5d4e4;
+  --color-muted: #5c6570;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+@layer base {
+  html {
+    @apply overflow-x-hidden;
+  }
+
+  body {
+    @apply antialiased overflow-x-hidden bg-paper text-ink font-sans;
+  }
+
+  #root {
+    @apply overflow-x-hidden;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2 bg-ink text-white font-medium rounded-sm hover:bg-ink-soft transition-colors duration-200;
+  }
+
+  .btn-secondary {
+    @apply px-6 py-3 bg-white text-ink font-semibold rounded-sm border border-ink hover:bg-paper-muted transition-colors duration-200;
+  }
+
+  .section-container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .admin-input {
+    @apply w-full border border-line bg-paper px-3 py-2 text-ink focus:outline-none focus:border-sky-deep;
+  }
+}
+
+/* Intro path draw */
+@keyframes bss-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes bss-rise {
+  from {
+    transform: translateY(12%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bss-intro * {
+    animation: none !important;
+    transition: none !important;
+  }
 }

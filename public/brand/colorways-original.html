@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>BSS v3 colorways — exact frames + watermark</title>
+    <style>
+      body { margin:0; padding:28px; background:#e8e4dc; font-family:Georgia,serif; color:#1a1a1a; }
+      h1 { font-size:1.2rem; font-weight:500; margin:0 0 6px; }
+      p { margin:0 0 20px; color:#5c574f; max-width:48rem; line-height:1.45; }
+      .grid {
+        display:grid;
+        grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+        gap:20px;
+      }
+      figure { margin:0; }
+      figure img {
+        width:100%;
+        height:auto;
+        display:block;
+        box-shadow:0 10px 32px rgba(0,0,0,.16);
+        background:#111;
+      }
+      figcaption {
+        margin-top:8px;
+        font-size:.78rem;
+        letter-spacing:.1em;
+        text-transform:uppercase;
+      }
+      .swatch {
+        display:inline-block;
+        width:10px; height:10px;
+        margin-right:6px;
+        vertical-align:middle;
+        outline:1px solid #0002;
+      }
+      .note {
+        margin-top:28px;
+        padding:14px 16px;
+        background:#fff;
+        border:1px solid #d5cfc3;
+        font-size:.9rem;
+        color:#444;
+        max-width:48rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Original v3 frames (exact) + extracted logo watermark</h1>
+    <p>
+      Viola frames are taken from the original v3 poster (same shape every time).
+      Watermark uses your extracted mark with tighter stacked type, tinted to each accent.
+    </p>
+    <div class="grid">
+      <figure>
+        <img src="./colorways/bss-v3-classic.png" alt="Classic crimson" />
+        <figcaption><span class="swatch" style="background:#bd2f2b"></span>Classic crimson</figcaption>
+      </figure>
+      <figure>
+        <img src="./colorways/bss-v3-gold.png" alt="Antique gold" />
+        <figcaption><span class="swatch" style="background:#c4a574"></span>Antique gold</figcaption>
+      </figure>
+      <figure>
+        <img src="./colorways/bss-v3-forest.png" alt="Forest light" />
+        <figcaption><span class="swatch" style="background:#5f8f6b"></span>Forest light</figcaption>
+      </figure>
+      <figure>
+        <img src="./colorways/bss-v3-blue.png" alt="Blue light" />
+        <figcaption><span class="swatch" style="background:#6f92b5"></span>Blue light</figcaption>
+      </figure>
+      <figure>
+        <img src="./colorways/bss-v3-sage.png" alt="Sage" />
+        <figcaption><span class="swatch" style="background:#a8c3a0"></span>Sage</figcaption>
+      </figure>
+      <figure>
+        <img src="./colorways/bss-v3-sky.png" alt="Sky" />
+        <figcaption><span class="swatch" style="background:#9db7d4"></span>Sky</figcaption>
+      </figure>
+      <figure>
+        <img src="./colorways/bss-v3-copper.png" alt="Copper" />
+        <figcaption><span class="swatch" style="background:#c9843f"></span>Copper</figcaption>
+      </figure>
+      <figure>
+        <img src="./colorways/bss-v3-cream.png" alt="Ink / cream" />
+        <figcaption><span class="swatch" style="background:#f0e6d8"></span>Ink / cream</figcaption>
+      </figure>
+    </div>
+    <div class="note">
+      Files live in <code>public/brand/colorways/</code>. Watermark SVG (tight spacing):
+      <code>bss-watermark.svg</code>.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Battery String Studio — mark colorways</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #ece8e1;
+        font-family: Georgia, serif;
+        color: #1a1a1a;
+      }
+      h1 {
+        font-weight: 500;
+        font-size: 1.25rem;
+        letter-spacing: 0.04em;
+        margin: 0 0 8px;
+      }
+      p {
+        margin: 0 0 28px;
+        color: #5a554e;
+        max-width: 52rem;
+        line-height: 1.45;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 24px;
+      }
+      figure {
+        margin: 0;
+      }
+      figure img,
+      figure object {
+        width: 100%;
+        height: auto;
+        display: block;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+      }
+      figcaption {
+        margin-top: 10px;
+        font-size: 0.85rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Battery String Studio — v3 mark (true knockout)</h1>
+    <p>
+      Built as SVG with clip/mask so letter color flips exactly where it crosses
+      the field. Tracking/leading match the open original spacing; type is raised
+      so part sits in the dark field.
+    </p>
+    <div class="grid">
+      <figure>
+        <object data="./bss-mark-v3.svg" type="image/svg+xml">classic</object>
+        <figcaption>Classic — black / crimson</figcaption>
+      </figure>
+      <figure>
+        <object data="./bss-mark-v3-gold.svg" type="image/svg+xml">gold</object>
+        <figcaption>Gold — black / antique gold</figcaption>
+      </figure>
+      <figure>
+        <object data="./bss-mark-v3-navy-cream.svg" type="image/svg+xml">navy</object>
+        <figcaption>Navy / cream</figcaption>
+      </figure>
+      <figure>
+        <object data="./bss-mark-v3-copper.svg" type="image/svg+xml">copper</object>
+        <figcaption>Copper — charcoal / copper</figcaption>
+      </figure>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1200" role="img" aria-label="Battery String Studio">
+  <!-- Original v3 poster + official bow-on-string logo (top-left, accent color) -->
+  <defs>
+    <style>
+      :root {
+        --field-dark: #0a0a0a;
+        --field-accent: #5f8f6b;
+      }
+      .dark { fill: var(--field-dark); }
+      .accent { fill: var(--field-accent); }
+      .type-main {
+        font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+        font-size: 72px;
+        font-weight: 600;
+        letter-spacing: 0.28em;
+        text-anchor: middle;
+      }
+      .type-corner {
+        font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: 0.18em;
+      }
+    </style>
+    <path
+      id="accent-field"
+      d="
+        M 0 640 L 0 1200 L 800 1200 L 800 640
+        L 620 640
+        C 605 615 595 575 598 530
+        C 602 470 625 420 655 385
+        C 675 360 685 335 675 315
+        C 662 290 630 285 605 300
+        C 555 325 525 385 515 450
+        C 505 510 510 575 530 640
+        L 270 640
+        C 290 575 295 510 285 450
+        C 275 385 245 325 195 300
+        C 170 285 138 290 125 315
+        C 115 335 125 360 145 385
+        C 175 420 198 470 202 530
+        C 205 575 195 615 180 640
+        Z
+      "
+    />
+    <!-- Official mark: bow on string (two parallel bow strokes + wavy string) -->
+    <g id="bow-string-mark" fill="none" stroke="var(--field-accent)" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 4 C18.5 14 21.5 22 19.5 32 C17.5 42 21 50 20 68" stroke-width="2.6"/>
+      <path d="M9 28 L31 40" stroke-width="2.4"/>
+      <path d="M10 33.5 L32 45.5" stroke-width="2.4"/>
+    </g>
+  </defs>
+
+  <rect class="dark" width="800" height="1200" />
+  <use href="#accent-field" class="accent" />
+
+  <path
+    d="M 155 360 C 145 320 150 280 175 260 C 200 240 235 245 250 275"
+    fill="none" stroke="var(--field-accent)" stroke-width="6.5" stroke-linecap="round"
+  />
+  <path
+    d="M 645 360 C 655 320 650 280 625 260 C 600 240 565 245 550 275"
+    fill="none" stroke="var(--field-accent)" stroke-width="7" stroke-linecap="round"
+  />
+
+  <!-- Top-left: official logo in bottom/accent color + wordmark -->
+  <g transform="translate(44 40)">
+    <use href="#bow-string-mark" transform="scale(1.35)" />
+    <text class="type-corner" x="68" y="38" fill="var(--field-accent)">BATTERY</text>
+    <text class="type-corner" x="68" y="64" fill="var(--field-accent)">STRING</text>
+  </g>
+
+  <!-- Main stacked type — bottom field only -->
+  <g transform="translate(400 0)" fill="var(--field-dark)">
+    <text class="type-main" x="0" y="820">BATTERY</text>
+    <text class="type-main" x="0" y="930">STRING</text>
+    <text class="type-main" x="0" y="1040">STUDIO</text>
+  </g>
+</svg>

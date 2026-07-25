@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1200" role="img" aria-labelledby="title desc">
+  <title id="title">Battery String Studio</title>
+  <desc id="desc">Battery String Studio — gold colorway</desc>
+
+  <defs>
+    <style>
+      :root {
+        --field-dark: #0a0a0a;
+        --field-accent: #c4a574;
+      }
+      .dark { fill: var(--field-dark); }
+      .accent { fill: var(--field-accent); }
+      .type {
+        font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+        font-size: 72px;
+        font-weight: 600;
+        letter-spacing: 0.28em;
+        text-anchor: middle;
+      }
+    </style>
+
+    <!--
+      Accent field = lower half + imperfect violin waist rising into dark.
+      Center keeps a black "U" pocket so stacked type can straddle cleanly.
+    -->
+    <path
+      id="accent-field"
+      d="
+        M 0 640
+        L 0 1200
+        L 800 1200
+        L 800 640
+
+        L 620 640
+        C 605 615 595 575 598 530
+        C 602 470 625 420 655 385
+        C 675 360 685 335 675 315
+        C 662 290 630 285 605 300
+        C 555 325 525 385 515 450
+        C 505 510 510 575 530 640
+
+        L 270 640
+        C 290 575 295 510 285 450
+        C 275 385 245 325 195 300
+        C 170 285 138 290 125 315
+        C 115 335 125 360 145 385
+        C 175 420 198 470 202 530
+        C 205 575 195 615 180 640
+        Z
+      "
+    />
+
+    <clipPath id="clip-accent" clipPathUnits="userSpaceOnUse">
+      <use href="#accent-field" />
+    </clipPath>
+
+    <mask id="mask-dark" maskUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="800" height="1200" fill="white" />
+      <use href="#accent-field" fill="black" />
+    </mask>
+  </defs>
+
+  <rect class="dark" width="800" height="1200" />
+  <use href="#accent-field" class="accent" />
+
+  <!-- Defined imperfect upper flourishes (not painted) -->
+  <path
+    d="M 155 360 C 145 320 150 280 175 260 C 200 240 235 245 250 275"
+    fill="none"
+    stroke="var(--field-accent)"
+    stroke-width="6.5"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 645 360 C 655 320 650 280 625 260 C 600 240 565 245 550 275"
+    fill="none"
+    stroke="var(--field-accent)"
+    stroke-width="7"
+    stroke-linecap="round"
+  />
+
+  <!--
+    Open spacing like original v3.
+    Raised: BATTERY mostly in dark (accent type),
+    STRING crosses, STUDIO mostly in accent (dark type).
+  -->
+  <g transform="translate(400 0)">
+    <g mask="url(#mask-dark)">
+      <text class="type" x="0" y="620" fill="var(--field-accent)">BATTERY</text>
+      <text class="type" x="0" y="740" fill="var(--field-accent)">STRING</text>
+      <text class="type" x="0" y="860" fill="var(--field-accent)">STUDIO</text>
+    </g>
+    <g clip-path="url(#clip-accent)">
+      <text class="type" x="0" y="620" fill="var(--field-dark)">BATTERY</text>
+      <text class="type" x="0" y="740" fill="var(--field-dark)">STRING</text>
+      <text class="type" x="0" y="860" fill="var(--field-dark)">STUDIO</text>
+    </g>
+  </g>
+</svg>

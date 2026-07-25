@@ -1,0 +1,36 @@
+<svg viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg">
+  <!-- Panel A: Primary full-color lockup -->
+  <rect x="20" y="20" width="960" height="260" rx="18" fill="#F3EDE0"/>
+
+  <g transform="translate(90,68)">
+    <path d="M75,38 C95,70 30,90 55,130 C80,170 15,190 45,222" fill="none" stroke="#B08D57" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="75" cy="30" r="9" fill="#B08D57"/>
+    <circle cx="45" cy="230" r="9" fill="#B08D57"/>
+    <line x1="30" y1="118" x2="78" y2="140" stroke="#B08D57" stroke-width="8" stroke-linecap="round"/>
+  </g>
+
+  <text x="260" y="140" font-family="Georgia, 'Times New Roman', serif" font-size="58" font-weight="700" letter-spacing="3" fill="#1B2A3A">BATTERY STRING</text>
+  <line x1="262" y1="168" x2="560" y2="168" stroke="#B08D57" stroke-width="2"/>
+  <text x="262" y="200" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="600" letter-spacing="10" fill="#B08D57">STUDIO</text>
+  <text x="262" y="235" font-family="Arial, Helvetica, sans-serif" font-size="15" letter-spacing="1" fill="#2C2C2C">Classical Violin &amp; Viola — Charleston, SC</text>
+
+  <!-- Section labels -->
+  <text x="40" y="308" font-family="Arial, Helvetica, sans-serif" font-size="14" letter-spacing="1" fill="#9a9a9a">ICON / AVATAR MARK</text>
+  <text x="540" y="308" font-family="Arial, Helvetica, sans-serif" font-size="14" letter-spacing="1" fill="#9a9a9a">SINGLE-COLOR VERSION</text>
+
+  <!-- Panel B, Column 1: Icon badge -->
+  <circle cx="250" cy="500" r="150" fill="#1B2A3A"/>
+  <g transform="translate(195,374)">
+    <path d="M75,38 C95,70 30,90 55,130 C80,170 15,190 45,222" fill="none" stroke="#D4AF74" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="75" cy="30" r="9" fill="#D4AF74"/>
+    <circle cx="45" cy="230" r="9" fill="#D4AF74"/>
+    <line x1="30" y1="118" x2="78" y2="140" stroke="#D4AF74" stroke-width="8" stroke-linecap="round"/>
+  </g>
+
+  <!-- Panel B, Column 2: Monochrome wordmark -->
+  <text x="750" y="480" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="46" font-weight="700" letter-spacing="2" fill="#1B2A3A">BATTERY STRING</text>
+  <line x1="680" y1="505" x2="820" y2="505" stroke="#1B2A3A" stroke-width="2"/>
+  <text x="750" y="535" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="600" letter-spacing="8" fill="#1B2A3A">STUDIO</text>
+
+  <text x="500" y="680" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#aaaaaa">Concept draft — happy to adjust colors, the mark, or type</text>
+</svg>
