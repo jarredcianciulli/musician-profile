@@ -5,7 +5,6 @@ import {
   Route,
   useLocation,
 } from "react-router-dom";
-import { motion } from "framer-motion";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import Home from "./pages/Home";
@@ -43,19 +42,15 @@ function PublicShell({ children }: { children: React.ReactNode }) {
     <div className="App min-h-screen flex flex-col bg-paper">
       {showIntro && <IntroSplash onComplete={finishIntro} />}
 
-      <motion.div
-        className="flex flex-col min-h-screen flex-grow"
-        initial={false}
-        animate={{
-          opacity: ready ? 1 : 0,
-          y: ready ? 0 : 12,
-        }}
-        transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+      <div
+        className={`flex flex-col min-h-screen flex-grow transition-opacity duration-500 ${
+          ready ? "opacity-100" : "opacity-0"
+        }`}
       >
         <Navbar visible={ready} />
         <main className="flex-grow">{children}</main>
         <Footer />
-      </motion.div>
+      </div>
     </div>
   );
 }

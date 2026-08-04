@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { motion } from "framer-motion";
 import { contactInfo } from "../config/contactInfo";
 import { brand } from "../config/brand";
 import { analytics } from "../utils/analytics";
@@ -14,7 +13,6 @@ const Hero: React.FC = () => {
       id="home"
       className="relative min-h-screen overflow-hidden pt-16 lg:pt-0"
     >
-      {/* Continuity with poster: soft sky wash into paper */}
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-sky/25 via-paper to-paper" />
 
       <div className="relative z-10">
@@ -22,54 +20,29 @@ const Hero: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
             <div className="flex items-center">
               <div className="w-full max-w-xl">
-                <motion.p
-                  className="text-sky-deep text-sm font-semibold tracking-[0.14em] uppercase mb-4"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.1 }}
-                >
+                <p className="text-sky-deep text-sm font-semibold tracking-[0.14em] uppercase mb-4">
                   Violin &amp; Viola Lessons · {contactInfo.area}, {contactInfo.state}
-                </motion.p>
+                </p>
 
-                <motion.h1
-                  className="font-display text-4xl sm:text-5xl lg:text-6xl font-semibold text-ink mb-6 leading-tight text-left"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.2 }}
-                >
+                <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-semibold text-ink mb-6 leading-tight text-left">
                   Same studio you saw
                   <br />
                   on the poster —
                   <br />
                   book a lesson here.
-                </motion.h1>
+                </h1>
 
-                <motion.p
-                  className="text-base sm:text-lg text-muted mb-3 leading-relaxed text-left"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.35 }}
-                >
+                <p className="text-base sm:text-lg text-muted mb-3 leading-relaxed text-left">
                   Private instruction with {brand.instructorName}. All ages and
                   levels — clear goals, serious musicianship, Charleston-area
                   studio.
-                </motion.p>
+                </p>
 
-                <motion.p
-                  className="text-sm text-muted mb-8"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.45 }}
-                >
+                <p className="text-sm text-muted mb-8">
                   {contactInfo.website} · {contactInfo.email}
-                </motion.p>
+                </p>
 
-                <motion.div
-                  className="flex flex-row gap-4"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.55 }}
-                >
+                <div className="flex flex-row gap-4">
                   <button
                     onClick={() => {
                       analytics.bookingModalOpened("Hero Section");
@@ -90,16 +63,11 @@ const Hero: React.FC = () => {
                   >
                     Learn More
                   </button>
-                </motion.div>
+                </div>
               </div>
             </div>
 
-            <motion.div
-              className="hidden lg:flex items-start justify-center pt-6"
-              initial={{ opacity: 0, x: 40 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.3 }}
-            >
+            <div className="hidden lg:flex items-start justify-center pt-6">
               <div className="w-full max-w-sm aspect-[3/4] overflow-hidden shadow-2xl border border-line">
                 <img
                   src={heroImage}
@@ -107,7 +75,7 @@ const Hero: React.FC = () => {
                   className="w-full h-full object-cover"
                 />
               </div>
-            </motion.div>
+            </div>
           </div>
         </div>
 

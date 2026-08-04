@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { motion } from "framer-motion";
 import { brand } from "../config/brand";
 import { contactInfo } from "../config/contactInfo";
 
@@ -72,40 +71,21 @@ const Credentials: React.FC = () => {
     <section id="credentials" className="py-20 bg-paper">
       <div className="section-container">
         <div className="max-w-3xl mb-14">
-          <motion.p
-            className="text-[11px] uppercase tracking-[0.18em] text-sky-deep font-semibold mb-3"
-            initial={{ opacity: 0, y: 12 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-          >
+          <p className="text-[11px] uppercase tracking-[0.18em] text-sky-deep font-semibold mb-3">
             Credentials
-          </motion.p>
-          <motion.h2
-            className="font-display text-4xl font-semibold text-ink mb-4"
-            initial={{ opacity: 0, y: 12 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-          >
+          </p>
+          <h2 className="font-display text-4xl font-semibold text-ink mb-4">
             Training that shows up in every lesson
-          </motion.h2>
-          <motion.p
-            className="text-lg text-muted"
-            initial={{ opacity: 0, y: 12 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-          >
+          </h2>
+          <p className="text-lg text-muted">
             {brand.instructorName} brings conservatory training and professional
             orchestral experience to private violin and viola study in{" "}
             {contactInfo.area}, {contactInfo.state}.
-          </motion.p>
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 mb-16">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-          >
+          <div>
             <h3 className="font-display text-2xl text-ink mb-6">Education</h3>
             <ul className="space-y-5">
               {education.map((item) => (
@@ -121,14 +101,9 @@ const Credentials: React.FC = () => {
               Patricia McCarty, Masao Kawasaki, and others. Festivals include
               Aspen, Meadowmount, and Trentino.
             </p>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.08 }}
-          >
+          <div>
             <h3 className="font-display text-2xl text-ink mb-6">
               Performance
             </h3>
@@ -149,15 +124,10 @@ const Credentials: React.FC = () => {
                 </li>
               ))}
             </ul>
-          </motion.div>
+          </div>
         </div>
 
-        <motion.div
-          className="border border-line bg-white px-6 py-8 sm:px-10"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-        >
+        <div className="border border-line bg-white px-6 py-8 sm:px-10">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
             <div>
               <h3 className="font-display text-2xl text-ink">
@@ -211,7 +181,7 @@ const Credentials: React.FC = () => {
               </div>
             </div>
           )}
-        </motion.div>
+        </div>
       </div>
     </section>
   );

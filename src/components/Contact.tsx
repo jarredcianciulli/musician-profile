@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { motion } from "framer-motion";
 import { contactInfo } from "../config/contactInfo";
 import { analytics } from "../utils/analytics";
 
@@ -69,35 +68,20 @@ const Contact: React.FC = () => {
     <section id="contact" className="py-20 bg-white">
       <div className="section-container">
         <div className="text-center mb-16">
-          <motion.h2
-            className="text-4xl font-bold text-gray-900 mb-4"
-            initial={{ opacity: 0, y: -20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
+          <h2
+            className="text-4xl font-bold text-gray-900 mb-4">
             Get in Touch
-          </motion.h2>
-          <motion.p
-            className="text-lg text-gray-600 max-w-2xl mx-auto"
-            initial={{ opacity: 0, y: -20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-          >
+          </h2>
+          <p
+            className="text-lg text-gray-600 max-w-2xl mx-auto">
             Ready to start your musical journey? Contact me to schedule a lesson
             or ask any questions.
-          </motion.p>
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
           {/* Left Column - Contact Form */}
-          <motion.div
-            initial={{ opacity: 0, x: -50 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
+          <div>
             <form
               onSubmit={handleSubmit}
               className="bg-white p-8 rounded-2xl border border-gray-200"
@@ -191,18 +175,13 @@ const Contact: React.FC = () => {
                 <p className="mt-4 text-sm text-gray-600">{statusMessage}</p>
               )}
             </form>
-          </motion.div>
+          </div>
 
           {/* Right Column - Contact Information Cards */}
           <div className="space-y-6">
             {/* Location Card */}
-            <motion.div
-              className="bg-gray-50 p-6 rounded-2xl"
-              initial={{ opacity: 0, x: 50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-            >
+            <div
+              className="bg-gray-50 p-6 rounded-2xl">
               <div className="flex items-start gap-4">
                 <div className="bg-primary-100 p-3 rounded-lg flex-shrink-0">
                   <svg
@@ -235,16 +214,11 @@ const Contact: React.FC = () => {
                   </p>
                 </div>
               </div>
-            </motion.div>
+            </div>
 
             {/* Email Card */}
-            <motion.div
-              className="bg-gray-50 p-6 rounded-2xl"
-              initial={{ opacity: 0, x: 50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-            >
+            <div
+              className="bg-gray-50 p-6 rounded-2xl">
               <div className="flex items-start gap-4">
                 <div className="bg-primary-100 p-3 rounded-lg flex-shrink-0">
                   <svg
@@ -269,16 +243,11 @@ const Contact: React.FC = () => {
                   </p>
                 </div>
               </div>
-            </motion.div>
+            </div>
 
             {/* Phone Card */}
-            <motion.div
-              className="bg-gray-50 p-6 rounded-2xl"
-              initial={{ opacity: 0, x: 50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-            >
+            <div
+              className="bg-gray-50 p-6 rounded-2xl">
               <div className="flex items-start gap-4">
                 <div className="bg-primary-100 p-3 rounded-lg flex-shrink-0">
                   <svg
@@ -303,16 +272,11 @@ const Contact: React.FC = () => {
                   </p>
                 </div>
               </div>
-            </motion.div>
+            </div>
 
             {/* Availability Card */}
-            <motion.div
-              className="bg-gray-50 p-6 rounded-2xl"
-              initial={{ opacity: 0, x: 50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-            >
+            <div
+              className="bg-gray-50 p-6 rounded-2xl">
               <div className="flex items-start gap-4">
                 <div className="bg-primary-100 p-3 rounded-lg flex-shrink-0">
                   <svg
@@ -334,16 +298,11 @@ const Contact: React.FC = () => {
                   <p className="text-gray-900">Monday - Saturday</p>
                 </div>
               </div>
-            </motion.div>
+            </div>
 
             {/* First Lesson Free Card */}
-            <motion.div
-              className="bg-primary-50 p-6 rounded-2xl border border-primary-200"
-              initial={{ opacity: 0, x: 50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.5 }}
-            >
+            <div
+              className="bg-primary-50 p-6 rounded-2xl border border-primary-200">
               <h3 className="font-bold text-gray-900 mb-3">
                 Free 30-minute intro
               </h3>
@@ -352,7 +311,7 @@ const Contact: React.FC = () => {
                 30-minute intro online — meet me, see the studio, and talk goals.
                 No payment required.
               </p>
-            </motion.div>
+            </div>
           </div>
         </div>
       </div>

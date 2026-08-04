@@ -1,5 +1,4 @@
 import React from "react";
-import { motion } from "framer-motion";
 import { contactInfo } from "../config/contactInfo";
 import { brand } from "../config/brand";
 import { analytics } from "../utils/analytics";
@@ -72,14 +71,13 @@ const Footer: React.FC = () => {
                 ["contact", "Contact"],
               ].map(([id, label]) => (
                 <li key={id}>
-                  <motion.a
+                  <a
                     href={`#${id}`}
                     className="hover:text-gold transition-colors cursor-pointer inline-block"
                     onClick={(e) => handleSmoothScroll(e as any, id)}
-                    whileHover={{ x: 4 }}
                   >
                     {label}
-                  </motion.a>
+                  </a>
                 </li>
               ))}
             </ul>

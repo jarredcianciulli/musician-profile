@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
 import { loadStudio } from "../../lib/studioApi";
 import { HolidayWeek, StudioEvent } from "../../types/studio";
 
@@ -69,13 +68,7 @@ const StudioCalendar: React.FC = () => {
   return (
     <section id="calendar" className="relative py-20 bg-paper">
       <div className="section-container">
-        <motion.div
-          className="max-w-2xl mb-12"
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-        >
+        <div className="max-w-2xl mb-12">
           <p className="text-gold-deep font-semibold text-sm tracking-wide uppercase mb-3">
             Studio calendar
           </p>
@@ -87,7 +80,7 @@ const StudioCalendar: React.FC = () => {
             tuition already accounts for them. Performances and studio events
             live here too.
           </p>
-        </motion.div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14">
           <div>
@@ -101,21 +94,14 @@ const StudioCalendar: React.FC = () => {
               <p className="text-muted">No upcoming holiday weeks posted yet.</p>
             )}
             <ul className="space-y-4">
-              {upcomingHolidays.map((h, i) => (
-                <motion.li
-                  key={h.id}
-                  className="border-l-2 border-gold pl-4 py-1"
-                  initial={{ opacity: 0, x: -8 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.05 }}
-                >
+              {upcomingHolidays.map((h) => (
+                <li key={h.id} className="border-l-2 border-gold pl-4 py-1">
                   <p className="font-semibold text-ink">{h.title}</p>
                   <p className="text-sm text-muted mt-0.5">
                     {formatDateRange(h.startDate, h.endDate)}
                   </p>
                   <p className="text-sm text-ink-soft/80 mt-1">{h.publicNote}</p>
-                </motion.li>
+                </li>
               ))}
             </ul>
           </div>
@@ -128,14 +114,10 @@ const StudioCalendar: React.FC = () => {
               <p className="text-muted">No upcoming performances posted yet.</p>
             )}
             <ul className="space-y-5">
-              {upcomingEvents.map((e, i) => (
-                <motion.li
+              {upcomingEvents.map((e) => (
+                <li
                   key={e.id}
                   className="bg-white/70 border border-line px-5 py-4"
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.05 }}
                 >
                   <p className="font-semibold text-ink text-lg">{e.title}</p>
                   <p className="text-sm text-gold-deep mt-1">
@@ -157,7 +139,7 @@ const StudioCalendar: React.FC = () => {
                       More info →
                     </a>
                   )}
-                </motion.li>
+                </li>
               ))}
             </ul>
           </div>

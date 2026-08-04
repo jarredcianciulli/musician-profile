@@ -1,5 +1,4 @@
 import React from "react";
-import { motion } from "framer-motion";
 import testimonialImg1 from "../assets/headshots/portfolio-home.jpeg";
 import testimonialImg2 from "../assets/headshots/home3.jpg";
 import testimonialImg3 from "../assets/headshots/imgBio.jpg";
@@ -36,37 +35,20 @@ const Testimonials: React.FC = () => {
     <section id="testimonials" className="py-20 bg-gray-50">
       <div className="section-container">
         <div className="text-center mb-16">
-          <motion.h2
-            className="text-4xl font-display font-bold text-gray-900 mb-4"
-            initial={{ opacity: 0, y: -20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
+          <h2 className="text-4xl font-display font-bold text-gray-900 mb-4">
             What Our Students Say
-          </motion.h2>
-          <motion.p
-            className="text-xl text-gray-600 max-w-2xl mx-auto"
-            initial={{ opacity: 0, y: -20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-          >
+          </h2>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Don't just take our word for it - hear from our amazing students!
-          </motion.p>
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {testimonials.map((testimonial, index) => (
-            <motion.div
+          {testimonials.map((testimonial) => (
+            <div
               key={testimonial.id}
               className="bg-white p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300"
-              initial={{ opacity: 0, y: 50 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.2 }}
             >
-              {/* Stars */}
               <div className="flex mb-4">
                 {[...Array(testimonial.rating)].map((_, i) => (
                   <svg
@@ -80,10 +62,8 @@ const Testimonials: React.FC = () => {
                 ))}
               </div>
 
-              {/* Quote */}
               <p className="text-gray-600 mb-6 italic">"{testimonial.text}"</p>
 
-              {/* Author */}
               <div className="flex items-center">
                 <img
                   src={testimonial.image}
@@ -99,19 +79,13 @@ const Testimonials: React.FC = () => {
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
 
-        <motion.div
-          className="text-center mt-12"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.6 }}
-        >
+        <div className="text-center mt-12">
           <button className="btn-primary">Read More Reviews</button>
-        </motion.div>
+        </div>
       </div>
     </section>
   );

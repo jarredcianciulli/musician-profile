@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
 import { analytics } from "../utils/analytics";
 import BookingModal from "./BookingModal";
 import LogoLockup from "./brand/LogoLockup";
@@ -28,6 +27,12 @@ const Navbar: React.FC<Props> = ({ visible = true }) => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  const openBooking = (source: string) => {
+    analytics.bookingModalOpened(source);
+    setIsOpen(false);
+    setIsBookingModalOpen(true);
+  };
+
   const handleSmoothScroll = (
     e: React.MouseEvent<HTMLAnchorElement>,
     targetId: string
@@ -42,19 +47,16 @@ const Navbar: React.FC<Props> = ({ visible = true }) => {
   };
 
   return (
-    <motion.nav
-      initial={false}
-      animate={{
-        y: visible ? 0 : -24,
-        opacity: visible ? 1 : 0,
-      }}
-      transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-      className={`fixed w-full top-0 z-50 transition-colors duration-300 ${
+    <nav
+      className={`fixed w-full top-0 z-50 transition-[background-color,border-color,box-shadow,opacity] duration-300 ${
         isOpen || isScrolled
           ? "bg-paper border-b border-line shadow-sm"
           : "bg-transparent"
       }`}
-      style={{ pointerEvents: visible ? "auto" : "none" }}
+      style={{
+        opacity: visible ? 1 : 0,
+        pointerEvents: visible ? "auto" : "none",
+      }}
     >
       <div className="section-container">
         <div className="flex items-center justify-between h-16">
@@ -73,25 +75,20 @@ const Navbar: React.FC<Props> = ({ visible = true }) => {
 
           <div className="hidden lg:flex items-center space-x-7">
             {navLinks.map((link) => (
-              <motion.a
+              <a
                 key={link.id}
                 href={`#${link.id}`}
                 className="text-ink-soft/90 hover:text-ink transition-colors cursor-pointer text-sm"
                 onClick={(e) => handleSmoothScroll(e as any, link.id)}
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.98 }}
               >
                 {link.label}
-              </motion.a>
+              </a>
             ))}
           </div>
 
           <div className="hidden lg:block">
             <button
-              onClick={() => {
-                analytics.bookingModalOpened("Navbar");
-                setIsBookingModalOpen(true);
-              }}
+              onClick={() => openBooking("Navbar")}
               className="btn-primary"
             >
               Book free intro
@@ -103,6 +100,7 @@ const Navbar: React.FC<Props> = ({ visible = true }) => {
               onClick={() => setIsOpen(!isOpen)}
               className="text-ink hover:text-sky-deep focus:outline-none"
               aria-label="Toggle menu"
+              aria-expanded={isOpen}
             >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 {isOpen ? (
@@ -116,35 +114,26 @@ const Navbar: React.FC<Props> = ({ visible = true }) => {
         </div>
 
         {isOpen && (
-          <motion.div
-            className="lg:hidden pb-4 bg-paper -mx-4 sm:-mx-6 px-4 sm:px-6 border-b border-line"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            transition={{ duration: 0.2 }}
-          >
+          <div className="lg:hidden pb-4 bg-paper -mx-4 sm:-mx-6 px-4 sm:px-6 border-b border-line">
             <div className="flex flex-col space-y-1">
               {navLinks.map((link) => (
-                <motion.a
+                <a
                   key={link.id}
                   href={`#${link.id}`}
                   className="text-ink hover:text-sky-deep transition-colors py-2 cursor-pointer"
                   onClick={(e) => handleSmoothScroll(e as any, link.id)}
-                  whileTap={{ scale: 0.98 }}
                 >
                   {link.label}
-                </motion.a>
+                </a>
               ))}
               <button
-                onClick={() => {
-                  analytics.bookingModalOpened("Mobile Menu");
-                  setIsBookingModalOpen(true);
-                }}
+                onClick={() => openBooking("Mobile Menu")}
                 className="btn-primary w-full mt-3"
               >
                 Book free intro
               </button>
             </div>
-          </motion.div>
+          </div>
         )}
       </div>
 
@@ -152,7 +141,7 @@ const Navbar: React.FC<Props> = ({ visible = true }) => {
         isOpen={isBookingModalOpen}
         onClose={() => setIsBookingModalOpen(false)}
       />
-    </motion.nav>
+    </nav>
   );
 };
 

@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { motion } from "framer-motion";
 import { contactInfo } from "../config/contactInfo";
 import { analytics } from "../utils/analytics";
 import BookingModal from "./BookingModal";
@@ -70,58 +69,27 @@ const Lessons: React.FC = () => {
     <section id="lessons" className="py-12 sm:py-16 lg:py-20 bg-gray-50">
       <div className="w-full px-4 sm:px-6">
         <div className="text-center mb-8 sm:mb-12 lg:mb-16">
-          <motion.h2
-            className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-3 sm:mb-4"
-            initial={{ opacity: 0, y: -20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-3 sm:mb-4">
             Lesson Options
-          </motion.h2>
-          <motion.p
-            className="text-gray-600 text-base sm:text-lg"
-            initial={{ opacity: 0, y: -20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-          >
+          </h2>
+          <p className="text-gray-600 text-base sm:text-lg">
             Flexible lesson formats designed to meet your learning goals
-          </motion.p>
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full">
-          {lessons.map((lesson, index) => (
-            <motion.div
+          {lessons.map((lesson) => (
+            <div
               key={lesson.id}
               className="bg-white rounded-lg sm:rounded-xl lg:rounded-2xl shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-50px" }}
-              transition={{ 
-                duration: 0.8, 
-                delay: index * 0.15,
-                ease: [0.25, 0.1, 0.25, 1]
-              }}
             >
-              {/* Image Section */}
-              <motion.div 
-                className="aspect-[5/2] overflow-hidden rounded-t-lg sm:rounded-t-xl lg:rounded-t-2xl"
-                initial={{ opacity: 0, scale: 1.05 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ 
-                  duration: 0.8, 
-                  delay: index * 0.15 + 0.2,
-                  ease: [0.25, 0.1, 0.25, 1]
-                }}
-              >
+              <div className="aspect-[5/2] overflow-hidden rounded-t-lg sm:rounded-t-xl lg:rounded-t-2xl">
                 <img
                   src={lesson.image}
                   alt={lesson.title}
                   className="w-full h-full object-cover"
                 />
-              </motion.div>
+              </div>
 
               {/* Content Section */}
               <div className="p-5 sm:p-6 lg:p-8">
@@ -175,19 +143,13 @@ const Lessons: React.FC = () => {
                   {lesson.button}
                 </button>
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
 
         {/* What to Expect Section */}
         <div className="mt-12 sm:mt-16 lg:mt-20 max-w-6xl mx-auto px-4 sm:px-6">
-          <motion.div
-            className="bg-white rounded-xl sm:rounded-2xl shadow-md p-6 sm:p-8 lg:p-12"
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
+          <div className="bg-white rounded-xl sm:rounded-2xl shadow-md p-6 sm:p-8 lg:p-12">
             <h3 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-8 sm:mb-10 lg:mb-12">
               What to Expect
             </h3>
@@ -283,7 +245,7 @@ const Lessons: React.FC = () => {
                 </div>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </div>
 
