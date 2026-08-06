@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { contactInfo } from "../config/contactInfo";
 import { brand } from "../config/brand";
 import { analytics } from "../utils/analytics";
+import { PUBLIC_BOOKING_COPY } from "../lib/bookingPolicy";
 import heroImage from "../assets/headshots/home3.webp";
 import BookingModal from "./BookingModal";
 
@@ -50,7 +51,7 @@ const Hero: React.FC = () => {
                     }}
                     className="btn-primary flex-1 sm:flex-none whitespace-nowrap text-sm"
                   >
-                    Book free intro
+                    {PUBLIC_BOOKING_COPY.cta}
                   </button>
                   <button
                     onClick={() => {

@@ -1,5 +1,6 @@
 import {
   AvailabilityConfig,
+  BusyInterval,
   DayHours,
   HolidayWeek,
   LessonBooking,
@@ -81,7 +82,6 @@ function zonedDateTime(
   minute: number,
   timeZone: string
 ): Date {
-  // Iterate from a UTC guess; refine with formatToParts offset.
   let utc = Date.UTC(year, month - 1, day, hour, minute, 0);
   for (let i = 0; i < 3; i++) {
     const p = zonedParts(new Date(utc), timeZone);
@@ -105,13 +105,22 @@ function isHolidayDate(dateKey: string, holidays: HolidayWeek[]): boolean {
   );
 }
 
-function overlaps(
+function toBusyList(
+  bookings: LessonBooking[],
+  extraBusy: BusyInterval[] = []
+): BusyInterval[] {
+  const fromBookings: BusyInterval[] = bookings
+    .filter((b) => b.status !== "cancelled")
+    .map((b) => ({ start: b.start, end: b.end }));
+  return [...fromBookings, ...extraBusy];
+}
+
+function overlapsBusy(
   startMs: number,
   endMs: number,
-  bookings: LessonBooking[]
+  busy: BusyInterval[]
 ): boolean {
-  return bookings.some((b) => {
-    if (b.status === "cancelled") return false;
+  return busy.some((b) => {
     const bStart = new Date(b.start).getTime();
     const bEnd = new Date(b.end).getTime();
     return startMs < bEnd && endMs > bStart;
@@ -119,7 +128,8 @@ function overlaps(
 }
 
 /**
- * Generate open lesson slots from weekly hours, excluding holidays + bookings.
+ * Fit lesson slots into published weekly windows.
+ * Busy = in-app bookings + optional Google free/busy (weeks off = calendar busy).
  */
 export function generateAvailableSlots(options: {
   from: string | Date;
@@ -128,26 +138,27 @@ export function generateAvailableSlots(options: {
   availability: AvailabilityConfig;
   holidays: HolidayWeek[];
   bookings: LessonBooking[];
+  /** Extra busy intervals (e.g. Google Calendar free/busy) */
+  busyIntervals?: BusyInterval[];
 }): TimeSlot[] {
   const {
     durationMinutes,
     availability,
     holidays,
     bookings,
+    busyIntervals = [],
   } = options;
   const timeZone = availability.timezone || "America/New_York";
-  const interval = availability.slotIntervalMinutes || 30;
+  const interval = availability.slotIntervalMinutes || 15;
   const slotMs = durationMinutes * 60 * 1000;
   const stepMs = interval * 60 * 1000;
+  const busy = toBusyList(bookings, busyIntervals);
 
   const fromMs = new Date(options.from).getTime();
   const toMs = new Date(options.to).getTime();
   const now = Date.now();
   const slots: TimeSlot[] = [];
 
-  // Walk day-by-day in studio timezone
-  let cursorDay = new Date(fromMs);
-  // Align to noon UTC-ish then step by calendar days via timezone parts
   for (let dayOffset = 0; dayOffset < 60; dayOffset++) {
     const probe = new Date(fromMs + dayOffset * 24 * 60 * 60 * 1000);
     const p = zonedParts(probe, timeZone);
@@ -186,8 +197,8 @@ export function generateAvailableSlots(options: {
       if (
         slotStart >= fromMs &&
         slotEnd <= toMs &&
-        slotStart >= now + 60 * 60 * 1000 && // at least 1h lead time
-        !overlaps(slotStart, slotEnd, bookings)
+        slotStart >= now + 60 * 60 * 1000 &&
+        !overlapsBusy(slotStart, slotEnd, busy)
       ) {
         slots.push({
           start: new Date(slotStart).toISOString(),
@@ -196,8 +207,6 @@ export function generateAvailableSlots(options: {
       }
       slotStart += stepMs;
     }
-
-    void cursorDay;
   }
 
   return slots;

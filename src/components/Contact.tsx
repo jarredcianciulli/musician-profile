@@ -207,10 +207,11 @@ const Contact: React.FC = () => {
                 <div>
                   <h3 className="font-bold text-gray-900 mb-1">Location</h3>
                   <p className="text-gray-900 mb-1">
-                    {contactInfo.city}, {contactInfo.state}
+                    Bowan Village area · {contactInfo.city}, {contactInfo.state}
                   </p>
                   <p className="text-sm text-gray-600">
-                    Serving the greater {contactInfo.area} area
+                    In-person or online — serving the greater {contactInfo.area}{" "}
+                    area
                   </p>
                 </div>
               </div>
@@ -295,21 +296,19 @@ const Contact: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-bold text-gray-900 mb-1">Availability</h3>
-                  <p className="text-gray-900">Monday - Saturday</p>
+                  <p className="text-gray-900">Mondays 6–8pm · Saturdays 8–11am ET</p>
                 </div>
               </div>
             </div>
 
-            {/* First Lesson Free Card */}
-            <div
-              className="bg-primary-50 p-6 rounded-2xl border border-primary-200">
+            {/* Trial promo */}
+            <div className="bg-primary-50 p-6 rounded-2xl border border-primary-200">
               <h3 className="font-bold text-gray-900 mb-3">
-                Free 30-minute intro
+                $35 trial · 30 minutes
               </h3>
               <p className="text-gray-600 leading-relaxed">
-                Not sure if lessons are right for you? Book a complimentary
-                30-minute intro online — meet me, see the studio, and talk goals.
-                No payment required.
+                Meet me and try it out — no commitment. Book at the home studio
+                in the Bowan Village area or online. Same rate either way.
               </p>
             </div>
           </div>

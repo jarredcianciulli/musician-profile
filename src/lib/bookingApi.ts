@@ -1,6 +1,7 @@
 import {
   AvailabilityConfig,
   LessonBooking,
+  LessonFormat,
   TimeSlot,
 } from "../types/studio";
 import {
@@ -17,16 +18,23 @@ import {
   generateAvailableSlots,
   rangeForDays,
 } from "./slots";
+import { contactInfo } from "../config/contactInfo";
 
 export { dayKey, formatSlotDay, formatSlotTime };
 
 const apiBase = (process.env.REACT_APP_STUDIO_API || "").replace(/\/$/, "");
 
+export type BookingConfirmation = {
+  format: LessonFormat;
+  area?: string;
+  address?: string | null;
+  instructions: string;
+};
+
 export async function fetchAvailableSlots(options?: {
   durationMinutes?: number;
   days?: number;
 }): Promise<{ slots: TimeSlot[]; availability: AvailabilityConfig }> {
-  // Public calendar is always free-intro length for now.
   const durationMinutes = PUBLIC_TRIAL_MINUTES;
   void options?.durationMinutes;
   const days = options?.days ?? 14;
@@ -80,18 +88,40 @@ export type CreateBookingInput = {
   notes?: string;
   durationMinutes: number;
   lessonType?: string;
+  format: LessonFormat;
 };
 
 export type CreateBookingResult = {
   booking: LessonBooking;
+  confirmation?: BookingConfirmation;
   email?: { ok: boolean; error?: string };
 };
+
+function localConfirmation(format: LessonFormat): BookingConfirmation {
+  if (format === "online") {
+    return {
+      format: "online",
+      instructions: PUBLIC_BOOKING_COPY.confirmationOnline,
+    };
+  }
+  return {
+    format: "in_person",
+    area: contactInfo.neighborhood,
+    address: null,
+    instructions: `Lessons are at the home studio in the ${contactInfo.neighborhood}. The full address will arrive in your confirmation email.`,
+  };
+}
 
 export async function createBooking(
   input: CreateBookingInput
 ): Promise<CreateBookingResult> {
   const lessonType = input.lessonType || PUBLIC_LESSON_TYPE;
   const durationMinutes = Number(input.durationMinutes);
+  const format = input.format;
+
+  if (format !== "in_person" && format !== "online") {
+    throw new Error("Choose a lesson format: at the home studio or online.");
+  }
 
   if (lessonType === "lesson") {
     throw new Error(PUBLIC_BOOKING_COPY.paidComingSoon);
@@ -101,7 +131,7 @@ export async function createBooking(
     durationMinutes !== PUBLIC_TRIAL_MINUTES
   ) {
     throw new Error(
-      "Only free 30-minute intro lessons are bookable online right now."
+      "Only the $35 / 30-minute trial is bookable online right now."
     );
   }
 
@@ -109,6 +139,7 @@ export async function createBooking(
     ...input,
     lessonType: PUBLIC_LESSON_TYPE,
     durationMinutes: PUBLIC_TRIAL_MINUTES,
+    format,
   };
 
   if (apiBase) {
@@ -160,6 +191,7 @@ export async function createBooking(
     email: emailNorm,
     notes: input.notes?.trim() || "",
     lessonType: PUBLIC_LESSON_TYPE,
+    format,
     durationMinutes: PUBLIC_TRIAL_MINUTES,
     status: "scheduled",
     createdAt: new Date().toISOString(),
@@ -170,7 +202,11 @@ export async function createBooking(
     bookings: [...studio.bookings, booking],
   });
 
-  return { booking, email: { ok: true } };
+  return {
+    booking,
+    confirmation: localConfirmation(format),
+    email: { ok: true },
+  };
 }
 
 export async function listBookingsAdmin(): Promise<LessonBooking[]> {

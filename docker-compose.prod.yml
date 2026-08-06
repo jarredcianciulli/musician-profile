@@ -11,7 +11,7 @@ services:
         REACT_APP_WEBSITE_DOMAIN: ${REACT_APP_WEBSITE_DOMAIN:-https://batterystringstudio.com}
         REACT_APP_LAB_URL: ${REACT_APP_LAB_URL:-https://lab.batterystringstudio.com}
         REACT_APP_METHOD_URL: ${REACT_APP_METHOD_URL:-https://method.batterystringstudio.com}
-        REACT_APP_STUDIO_EMAIL: ${REACT_APP_STUDIO_EMAIL:-hello@batterystringstudio.com}
+        REACT_APP_STUDIO_EMAIL: ${REACT_APP_STUDIO_EMAIL:-jarred@batterystringstudio.com}
     container_name: bss_studio_prod
     ports:
       - "8087:80"

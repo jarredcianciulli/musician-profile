@@ -2,152 +2,174 @@ import React, { useState } from "react";
 import { contactInfo } from "../config/contactInfo";
 import { analytics } from "../utils/analytics";
 import BookingModal from "./BookingModal";
-import privateLessonImage from "../assets/images/xingchen-yan-A3LQGkOwZ9E-unsplash.jpg";
-import groupLessonImage from "../assets/images/joel-timothy-3MDVR18ciOQ-unsplash.jpg";
+import {
+  DEFAULT_SUBSCRIPTION_MINUTES,
+  PUBLIC_BOOKING_COPY,
+  PUBLIC_TRIAL_PRICE,
+  PUBLIC_TRIAL_MINUTES,
+  SUBSCRIPTION_DURATIONS,
+  SUBSCRIPTION_MONTHLY_RATES,
+  SubscriptionDuration,
+} from "../lib/bookingPolicy";
 
 const Lessons: React.FC = () => {
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [duration, setDuration] = useState<SubscriptionDuration>(
+    DEFAULT_SUBSCRIPTION_MINUTES
+  );
 
-  const handleButtonClick = (lessonType: string) => {
-    if (lessonType === "private") {
-      analytics.bookingModalOpened("Lessons Section - Private");
-      setIsBookingModalOpen(true);
-    } else if (lessonType === "group") {
-      analytics.expressInterestClicked();
-      // Scroll to contact section
-      const contactSection = document.getElementById("contact");
-      if (contactSection) {
-        contactSection.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-      // Pre-fill message after scroll
-      setTimeout(() => {
-        const messageInput = document.querySelector('textarea[name="message"]') as HTMLTextAreaElement;
-        if (messageInput) {
-          messageInput.value = "I'm interested in group classes. Please let me know when they're available!";
-          messageInput.focus();
-        }
-      }, 800);
-    }
+  const monthlyPrice = SUBSCRIPTION_MONTHLY_RATES[duration];
+
+  const openTrialBooking = (source: string) => {
+    analytics.bookingModalOpened(source);
+    setIsBookingModalOpen(true);
   };
-  const lessons = [
-    {
-      id: 1,
-      type: "private",
-      title: "Private Lessons",
-      description:
-        "One-on-one instruction tailored to your goals. Start with a free 30-minute intro — paid lesson lengths come next with Stripe.",
-      image: privateLessonImage,
-      features: [
-        "Free 30-minute intro online",
-        "Personalized curriculum and pacing",
-        "Technique, theory, and musicality",
-        "Performance preparation",
-      ],
-      button: "Book free intro",
-      buttonVariant: "black",
-    },
-    {
-      id: 2,
-      type: "group",
-      title: "Group Classes",
-      comingSoon: true,
-      description:
-        "Learn alongside other students in a collaborative environment. Great for building ensemble skills and musical community.",
-      image: groupLessonImage,
-      features: [
-        "Small group settings for individual attention",
-        "Ensemble playing and collaboration",
-        "Music theory and ear training",
-        "Affordable group rates",
-      ],
-      button: "Express Interest",
-      buttonVariant: "white",
-    },
-  ];
 
   return (
     <section id="lessons" className="py-12 sm:py-16 lg:py-20 bg-gray-50">
       <div className="w-full px-4 sm:px-6">
         <div className="text-center mb-8 sm:mb-12 lg:mb-16">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-3 sm:mb-4">
-            Lesson Options
+            Lessons &amp; Pricing
           </h2>
-          <p className="text-gray-600 text-base sm:text-lg">
-            Flexible lesson formats designed to meet your learning goals
+          <p className="text-gray-600 text-base sm:text-lg max-w-2xl mx-auto">
+            Start with a trial, then weekly private lessons billed as one simple
+            monthly rate — in the {contactInfo.neighborhood} or online.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full">
-          {lessons.map((lesson) => (
-            <div
-              key={lesson.id}
-              className="bg-white rounded-lg sm:rounded-xl lg:rounded-2xl shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300"
-            >
-              <div className="aspect-[5/2] overflow-hidden rounded-t-lg sm:rounded-t-xl lg:rounded-t-2xl">
-                <img
-                  src={lesson.image}
-                  alt={lesson.title}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-
-              {/* Content Section */}
-              <div className="p-5 sm:p-6 lg:p-8">
-                <div className="text-left sm:text-center mb-3">
-                  <div className="flex items-center justify-start sm:justify-center gap-2 sm:gap-3">
-                    <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 whitespace-nowrap">
-                      {lesson.title}
-                    </h3>
-                    {lesson.comingSoon && (
-                      <span className="bg-primary-100 text-primary-700 text-sm font-semibold px-3 py-1 rounded-full whitespace-nowrap flex-shrink-0 ml-auto sm:ml-0">
-                        Coming Soon
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <p className="text-gray-600 mb-4 sm:mb-5 leading-relaxed text-sm sm:text-base text-left sm:text-center">
-                  {lesson.description}
-                </p>
-
-                <ul className="space-y-1.5 sm:space-y-2 mb-5 sm:mb-6">
-                  {lesson.features.map((feature, index) => (
-                    <li
-                      key={index}
-                      className="flex items-start text-gray-700 text-sm sm:text-base"
-                    >
-                      <svg
-                        className="w-5 h-5 text-green-500 mr-3 flex-shrink-0 mt-0.5"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <button
-                  onClick={() => handleButtonClick(lesson.type)}
-                  className={`w-full px-6 py-3 font-bold rounded-lg transition-colors duration-200 whitespace-nowrap text-sm sm:text-base ${
-                    lesson.buttonVariant === "black"
-                      ? "bg-black text-white hover:bg-gray-800"
-                      : "bg-white text-gray-900 border-2 border-gray-900 hover:bg-gray-50"
-                  }`}
-                >
-                  {lesson.button}
-                </button>
-              </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full max-w-6xl mx-auto">
+          {/* Trial — start here */}
+          <div className="bg-white rounded-lg sm:rounded-xl lg:rounded-2xl shadow-md border-2 border-ink overflow-hidden flex flex-col">
+            <div className="bg-ink text-paper px-5 sm:px-6 py-3">
+              <p className="text-[11px] uppercase tracking-[0.18em] font-semibold">
+                Start here
+              </p>
             </div>
-          ))}
+            <div className="p-5 sm:p-6 lg:p-8 flex flex-col flex-1">
+              <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2">
+                Trial lesson
+              </h3>
+              <p className="text-gray-600 mb-6 leading-relaxed text-sm sm:text-base">
+                Meet me and try it out, no commitment.
+              </p>
+              <div className="mb-6">
+                <p className="font-display text-5xl sm:text-6xl font-semibold text-ink leading-none">
+                  ${PUBLIC_TRIAL_PRICE}
+                </p>
+                <p className="text-muted mt-2 text-sm sm:text-base">
+                  {PUBLIC_TRIAL_MINUTES} minutes · violin or viola
+                </p>
+              </div>
+              <ul className="space-y-2 mb-8 text-sm sm:text-base text-gray-700 flex-1">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5" aria-hidden>
+                    ✓
+                  </span>
+                  See if we&apos;re a good fit
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5" aria-hidden>
+                    ✓
+                  </span>
+                  Studio ({contactInfo.neighborhood}) or online
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5" aria-hidden>
+                    ✓
+                  </span>
+                  No subscription required to book
+                </li>
+              </ul>
+              <button
+                type="button"
+                onClick={() => openTrialBooking("Lessons Section - Trial")}
+                className="btn-primary w-full"
+              >
+                {PUBLIC_BOOKING_COPY.cta}
+              </button>
+            </div>
+          </div>
+
+          {/* Subscription */}
+          <div className="bg-white rounded-lg sm:rounded-xl lg:rounded-2xl shadow-md overflow-hidden flex flex-col border border-gray-200">
+            <div className="p-5 sm:p-6 lg:p-8 flex flex-col flex-1">
+              <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-3">
+                Weekly private lessons
+              </h3>
+              <p className="text-gray-600 mb-6 leading-relaxed text-sm sm:text-base">
+                {PUBLIC_BOOKING_COPY.subscriptionHeader}
+              </p>
+
+              <div
+                className="inline-flex self-start border border-line bg-paper-muted/50 p-1 mb-6"
+                role="group"
+                aria-label="Lesson length"
+              >
+                {SUBSCRIPTION_DURATIONS.map((mins) => {
+                  const active = duration === mins;
+                  return (
+                    <button
+                      key={mins}
+                      type="button"
+                      onClick={() => setDuration(mins)}
+                      className={`px-3 sm:px-4 py-2 text-sm font-semibold transition-colors ${
+                        active
+                          ? "bg-ink text-paper"
+                          : "text-ink-soft hover:text-ink"
+                      }`}
+                    >
+                      {mins} min
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mb-2">
+                <p className="font-display text-5xl sm:text-6xl font-semibold text-ink leading-none">
+                  ${monthlyPrice}
+                  <span className="text-lg sm:text-xl font-sans font-medium text-muted ml-1">
+                    /month
+                  </span>
+                </p>
+              </div>
+              <p className="text-sm text-muted mb-8 leading-relaxed">
+                {PUBLIC_BOOKING_COPY.subscriptionFootnote}
+              </p>
+
+              <ul className="space-y-2 mb-8 text-sm sm:text-base text-gray-700 flex-1">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5" aria-hidden>
+                    ✓
+                  </span>
+                  One-on-one instruction, your goals and pacing
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5" aria-hidden>
+                    ✓
+                  </span>
+                  Same rate at the studio or online
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5" aria-hidden>
+                    ✓
+                  </span>
+                  Set up after your trial — no surprise bills
+                </li>
+              </ul>
+
+              <button
+                type="button"
+                onClick={() => openTrialBooking("Lessons Section - Subscription CTA")}
+                className="w-full px-6 py-3 font-bold rounded-lg bg-white text-gray-900 border-2 border-gray-900 hover:bg-gray-50 transition-colors"
+              >
+                Start with a trial
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* What to Expect Section */}
+        {/* What to Expect */}
         <div className="mt-12 sm:mt-16 lg:mt-20 max-w-6xl mx-auto px-4 sm:px-6">
           <div className="bg-white rounded-xl sm:rounded-2xl shadow-md p-6 sm:p-8 lg:p-12">
             <h3 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-8 sm:mb-10 lg:mb-12">
@@ -155,7 +177,6 @@ const Lessons: React.FC = () => {
             </h3>
 
             <div className="space-y-8 sm:space-y-10 lg:space-y-12">
-              {/* Flexible Scheduling */}
               <div className="flex items-start gap-3 sm:gap-4">
                 <div className="bg-primary-100 w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 p-2">
                   <svg
@@ -177,13 +198,11 @@ const Lessons: React.FC = () => {
                     Flexible Scheduling
                   </h4>
                   <p className="text-gray-600 leading-relaxed text-sm sm:text-base">
-                    Lesson times that work with your schedule, including
-                    after-school and evening options
+                    Mondays 6–8pm and Saturdays 8–11am ET — in person or online
                   </p>
                 </div>
               </div>
 
-              {/* Hanahan Location */}
               <div className="flex items-start gap-3 sm:gap-4">
                 <div className="bg-primary-100 w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 p-2">
                   <svg
@@ -208,16 +227,16 @@ const Lessons: React.FC = () => {
                 </div>
                 <div className="flex-1">
                   <h4 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 sm:mb-3">
-                    {contactInfo.city} Location
+                    {contactInfo.neighborhood}
                   </h4>
                   <p className="text-gray-600 leading-relaxed text-sm sm:text-base">
-                    Convenient location in {contactInfo.city}, {contactInfo.state} with a comfortable
-                    teaching studio
+                    In-person lessons at my home studio in the{" "}
+                    {contactInfo.neighborhood}, {contactInfo.city},{" "}
+                    {contactInfo.state} — or online by video. Same rate either way.
                   </p>
                 </div>
               </div>
 
-              {/* All Ages Welcome */}
               <div className="flex items-start gap-3 sm:gap-4">
                 <div className="bg-primary-100 w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 p-2">
                   <svg
@@ -249,7 +268,6 @@ const Lessons: React.FC = () => {
         </div>
       </div>
 
-      {/* Booking Modal */}
       <BookingModal
         isOpen={isBookingModalOpen}
         onClose={() => setIsBookingModalOpen(false)}

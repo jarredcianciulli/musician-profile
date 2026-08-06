@@ -1,25 +1,29 @@
 import { generateAvailableSlots } from "./slots.js";
+import {
+  fetchGoogleBusyIntervals,
+  googleCalendarConfigured,
+} from "./googleCalendar.js";
 
 const STORE_KEY = "studio_payload_v2";
 
-/** Public online booking: free 30-min intro only (Stripe/paid next). */
+/** Public online booking: $35 / 30-min trial */
 const PUBLIC_TRIAL_MINUTES = 30;
 const PUBLIC_LESSON_TYPE = "trial";
+const PUBLIC_FORMATS = new Set(["in_person", "online"]);
 
 const defaultAvailability = {
   timezone: "America/New_York",
-  slotIntervalMinutes: 30,
-  // 45/60 kept for admin / future paid Checkout; public API forces 30.
+  slotIntervalMinutes: 15,
   durationsMinutes: [30, 45, 60],
   defaultDurationMinutes: 30,
   weeklyHours: [
     { day: 0, start: "10:00", end: "14:00", enabled: false },
-    { day: 1, start: "15:00", end: "20:00", enabled: true },
-    { day: 2, start: "15:00", end: "20:00", enabled: true },
-    { day: 3, start: "15:00", end: "20:00", enabled: true },
-    { day: 4, start: "15:00", end: "20:00", enabled: true },
-    { day: 5, start: "15:00", end: "20:00", enabled: true },
-    { day: 6, start: "09:00", end: "13:00", enabled: true },
+    { day: 1, start: "18:00", end: "20:00", enabled: true }, // Mon 6–8pm ET
+    { day: 2, start: "15:00", end: "20:00", enabled: false },
+    { day: 3, start: "15:00", end: "20:00", enabled: false },
+    { day: 4, start: "15:00", end: "20:00", enabled: false },
+    { day: 5, start: "15:00", end: "20:00", enabled: false },
+    { day: 6, start: "08:00", end: "11:00", enabled: true }, // Sat 8–11am ET
   ],
 };
 
@@ -113,7 +117,6 @@ async function readPayload(env) {
   if (!env.STUDIO_KV) return structuredClone(seed);
   const stored = await env.STUDIO_KV.get(STORE_KEY, "json");
   if (stored) return normalizePayload(stored);
-  // Migrate v1 if present
   const legacy = await env.STUDIO_KV.get("studio_payload_v1", "json");
   return normalizePayload(legacy);
 }
@@ -153,7 +156,26 @@ function publicStudio(payload) {
       weeklyHours: payload.availability.weeklyHours,
     },
     updatedAt: payload.updatedAt,
-    // Never expose booking PII publicly
+  };
+}
+
+/** Street address never goes in public studio GET — only post-booking for in-person. */
+function confirmationDetails(env, format) {
+  if (format === "online") {
+    return {
+      format: "online",
+      instructions:
+        "You'll get a video link by email before the lesson.",
+    };
+  }
+  const street = (env.STUDIO_STREET_ADDRESS || "").trim();
+  return {
+    format: "in_person",
+    area: "Bowan Village area",
+    address: street || null,
+    instructions: street
+      ? `Lessons are at the home studio in the Bowan Village area. Address: ${street}`
+      : "Lessons are at the home studio in the Bowan Village area. The full address will arrive in your confirmation email.",
   };
 }
 
@@ -212,7 +234,6 @@ export default {
         holidays: body.holidays,
         events: body.events,
         availability: body.availability || current.availability,
-        // Preserve bookings unless admin explicitly sends them
         bookings: Array.isArray(body.bookings) ? body.bookings : current.bookings,
         updatedAt: new Date().toISOString(),
       });
@@ -234,16 +255,17 @@ export default {
       return json(next, 200, origin);
     }
 
-    // --- Booking: public slots (free 30-min intro only) ---
+    // --- Booking: public slots ($35 trial, Google free/busy when configured) ---
     if (request.method === "GET" && route === "/studio/booking/slots") {
       const payload = await readPayload(env);
-      // Ignore client duration — public calendar is trial-length only for now.
       const durationMinutes = PUBLIC_TRIAL_MINUTES;
       const from =
         url.searchParams.get("from") || new Date().toISOString();
       const toDefault = new Date();
       toDefault.setDate(toDefault.getDate() + 14);
       const to = url.searchParams.get("to") || toDefault.toISOString();
+
+      const busyIntervals = await fetchGoogleBusyIntervals(env, from, to);
 
       const slots = generateAvailableSlots({
         from,
@@ -252,6 +274,7 @@ export default {
         availability: payload.availability,
         holidays: payload.holidays,
         bookings: payload.bookings,
+        busyIntervals,
       });
 
       const availability = {
@@ -260,10 +283,18 @@ export default {
         durationsMinutes: [PUBLIC_TRIAL_MINUTES],
       };
 
-      return json({ slots, availability }, 200, origin);
+      return json(
+        {
+          slots,
+          availability,
+          calendarSync: googleCalendarConfigured(env),
+        },
+        200,
+        origin
+      );
     }
 
-    // --- Booking: create (public = free trial only; paid → Stripe later) ---
+    // --- Booking: create trial ---
     if (request.method === "POST" && route === "/studio/booking") {
       let body;
       try {
@@ -275,6 +306,7 @@ export default {
       const { start, end, name, email, notes = "" } = body || {};
       const lessonType = String(body?.lessonType || PUBLIC_LESSON_TYPE);
       const durationMinutes = Number(body?.durationMinutes || PUBLIC_TRIAL_MINUTES);
+      const format = String(body?.format || "");
 
       if (!start || !end || !name?.trim() || !email?.trim()) {
         return json(
@@ -284,12 +316,22 @@ export default {
         );
       }
 
-      // Paid path stub — Stripe Checkout next phase
+      if (!PUBLIC_FORMATS.has(format)) {
+        return json(
+          {
+            error:
+              "Choose a lesson format: at the home studio or online.",
+          },
+          400,
+          origin
+        );
+      }
+
       if (lessonType === "lesson") {
         return json(
           {
             error:
-              "Paid lessons will check out through Stripe soon. Book a free 30-minute intro for now.",
+              "Ongoing monthly lessons are set up after your trial. Book a $35 trial to get started.",
           },
           501,
           origin
@@ -302,8 +344,7 @@ export default {
       ) {
         return json(
           {
-            error:
-              "Only free 30-minute intro lessons are bookable online right now.",
+            error: "Only the $35 / 30-minute trial is bookable online right now.",
           },
           400,
           origin
@@ -323,12 +364,18 @@ export default {
         return json(
           {
             error:
-              "This email already has a free intro booked. Use Contact if you need to reschedule.",
+              "This email already has a trial booked. Use Contact if you need to reschedule.",
           },
           409,
           origin
         );
       }
+
+      const busyIntervals = await fetchGoogleBusyIntervals(
+        env,
+        start,
+        new Date(new Date(end).getTime() + 1000).toISOString()
+      );
 
       const open = generateAvailableSlots({
         from: start,
@@ -337,6 +384,7 @@ export default {
         availability: payload.availability,
         holidays: payload.holidays,
         bookings: payload.bookings,
+        busyIntervals,
       });
 
       if (!open.some((s) => s.start === start)) {
@@ -355,6 +403,7 @@ export default {
         email: emailNorm,
         notes: String(notes || "").trim(),
         lessonType: PUBLIC_LESSON_TYPE,
+        format,
         durationMinutes: PUBLIC_TRIAL_MINUTES,
         status: "scheduled",
         createdAt: new Date().toISOString(),
@@ -376,11 +425,19 @@ export default {
         );
       }
 
-      // Brevo confirmation can hook here (Phase 2b)
-      return json({ booking, email: { ok: true } }, 201, origin);
+      const confirmation = confirmationDetails(env, format);
+
+      return json(
+        {
+          booking,
+          confirmation,
+          email: { ok: true },
+        },
+        201,
+        origin
+      );
     }
 
-    // --- Booking: admin list ---
     if (request.method === "GET" && route === "/studio/booking") {
       const token = getBearer(request);
       if (!env.ADMIN_TOKEN || token !== env.ADMIN_TOKEN) {

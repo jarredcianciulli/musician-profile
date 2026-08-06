@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { analytics } from "../utils/analytics";
+import { PUBLIC_BOOKING_COPY } from "../lib/bookingPolicy";
 import BookingModal from "./BookingModal";
 import LogoLockup from "./brand/LogoLockup";
 
@@ -91,7 +92,7 @@ const Navbar: React.FC<Props> = ({ visible = true }) => {
               onClick={() => openBooking("Navbar")}
               className="btn-primary"
             >
-              Book free intro
+              {PUBLIC_BOOKING_COPY.cta}
             </button>
           </div>
 
@@ -130,7 +131,7 @@ const Navbar: React.FC<Props> = ({ visible = true }) => {
                 onClick={() => openBooking("Mobile Menu")}
                 className="btn-primary w-full mt-3"
               >
-                Book free intro
+                {PUBLIC_BOOKING_COPY.cta}
               </button>
             </div>
           </div>

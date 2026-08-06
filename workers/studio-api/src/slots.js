@@ -61,9 +61,15 @@ function isHolidayDate(dateKey, holidays) {
   );
 }
 
-function overlaps(startMs, endMs, bookings) {
-  return (bookings || []).some((b) => {
-    if (b.status === "cancelled") return false;
+function toBusyList(bookings, extraBusy = []) {
+  const fromBookings = (bookings || [])
+    .filter((b) => b.status !== "cancelled")
+    .map((b) => ({ start: b.start, end: b.end }));
+  return [...fromBookings, ...extraBusy];
+}
+
+function overlapsBusy(startMs, endMs, busy) {
+  return (busy || []).some((b) => {
     const bStart = new Date(b.start).getTime();
     const bEnd = new Date(b.end).getTime();
     return startMs < bEnd && endMs > bStart;
@@ -77,9 +83,10 @@ export function generateAvailableSlots({
   availability,
   holidays,
   bookings,
+  busyIntervals = [],
 }) {
   const timeZone = availability?.timezone || "America/New_York";
-  const interval = availability?.slotIntervalMinutes || 30;
+  const interval = availability?.slotIntervalMinutes || 15;
   const slotMs = durationMinutes * 60 * 1000;
   const stepMs = interval * 60 * 1000;
   const fromMs = new Date(from).getTime();
@@ -87,6 +94,7 @@ export function generateAvailableSlots({
   const now = Date.now();
   const slots = [];
   const weekly = availability?.weeklyHours || [];
+  const busy = toBusyList(bookings, busyIntervals);
 
   for (let dayOffset = 0; dayOffset < 60; dayOffset++) {
     const probe = new Date(fromMs + dayOffset * 24 * 60 * 60 * 1000);
@@ -126,7 +134,7 @@ export function generateAvailableSlots({
         slotStart >= fromMs &&
         slotEnd <= toMs &&
         slotStart >= now + 60 * 60 * 1000 &&
-        !overlaps(slotStart, slotEnd, bookings)
+        !overlapsBusy(slotStart, slotEnd, busy)
       ) {
         slots.push({
           start: new Date(slotStart).toISOString(),

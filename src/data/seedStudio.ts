@@ -3,18 +3,18 @@ import { AvailabilityConfig, StudioPayload } from "../types/studio";
 /** Default teaching hours — Charleston (America/New_York). Editable in /admin. */
 export const defaultAvailability: AvailabilityConfig = {
   timezone: "America/New_York",
-  slotIntervalMinutes: 30,
-  /** Public booking uses 30 only (free intro). 45/60 reserved for Stripe later. */
+  /** Fit bookings into open windows in 15-minute increments */
+  slotIntervalMinutes: 15,
   durationsMinutes: [30, 45, 60],
   defaultDurationMinutes: 30,
   weeklyHours: [
     { day: 0, start: "10:00", end: "14:00", enabled: false }, // Sun
-    { day: 1, start: "15:00", end: "20:00", enabled: true }, // Mon
-    { day: 2, start: "15:00", end: "20:00", enabled: true },
-    { day: 3, start: "15:00", end: "20:00", enabled: true },
-    { day: 4, start: "15:00", end: "20:00", enabled: true },
-    { day: 5, start: "15:00", end: "20:00", enabled: true },
-    { day: 6, start: "09:00", end: "13:00", enabled: true }, // Sat
+    { day: 1, start: "18:00", end: "20:00", enabled: true }, // Mon 6–8pm ET
+    { day: 2, start: "15:00", end: "20:00", enabled: false }, // Tue
+    { day: 3, start: "15:00", end: "20:00", enabled: false }, // Wed
+    { day: 4, start: "15:00", end: "20:00", enabled: false }, // Thu
+    { day: 5, start: "15:00", end: "20:00", enabled: false }, // Fri
+    { day: 6, start: "08:00", end: "11:00", enabled: true }, // Sat 8–11am ET
   ],
 };
 

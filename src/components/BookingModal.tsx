@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { brand } from "../config/brand";
 import {
+  BookingConfirmation,
   createBooking,
   dayKey,
   fetchAvailableSlots,
@@ -13,7 +14,7 @@ import {
   PUBLIC_BOOKING_COPY,
   PUBLIC_TRIAL_MINUTES,
 } from "../lib/bookingPolicy";
-import { AvailabilityConfig, TimeSlot } from "../types/studio";
+import { AvailabilityConfig, LessonFormat, TimeSlot } from "../types/studio";
 import { defaultAvailability } from "../data/seedStudio";
 import { analytics } from "../utils/analytics";
 import { lockBodyScroll, unlockBodyScroll } from "../lib/scrollLock";
@@ -21,7 +22,6 @@ import { lockBodyScroll, unlockBodyScroll } from "../lib/scrollLock";
 interface BookingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  /** Optional override title */
   title?: string;
 }
 
@@ -35,6 +35,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [selectedDay, setSelectedDay] = useState("");
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
+  const [format, setFormat] = useState<LessonFormat>("in_person");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [notes, setNotes] = useState("");
@@ -42,6 +43,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [confirmation, setConfirmation] =
+    useState<BookingConfirmation | null>(null);
 
   const timezone = availability.timezone || "America/New_York";
   const durationMinutes = PUBLIC_TRIAL_MINUTES;
@@ -81,7 +84,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
     setError("");
     setSuccess(false);
+    setConfirmation(null);
     setSelectedSlot(null);
+    setFormat("in_person");
     setLoading(true);
     setSlots([]);
     setSelectedDay("");
@@ -138,7 +143,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
     setSubmitting(true);
     setError("");
     try {
-      await createBooking({
+      const result = await createBooking({
         start: selectedSlot.start,
         end: selectedSlot.end,
         name: name.trim(),
@@ -146,8 +151,10 @@ const BookingModal: React.FC<BookingModalProps> = ({
         notes: notes.trim(),
         durationMinutes: PUBLIC_TRIAL_MINUTES,
         lessonType: "trial",
+        format,
       });
       analytics.bookingCompleted();
+      setConfirmation(result.confirmation || null);
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Booking failed.");
@@ -224,12 +231,33 @@ const BookingModal: React.FC<BookingModalProps> = ({
                       {PUBLIC_BOOKING_COPY.successTitle}
                     </h3>
                     <p className="text-ink-soft">
-                      Free intro · {formatSlotDay(selectedSlot.start, timezone)}{" "}
+                      $35 trial · {formatSlotDay(selectedSlot.start, timezone)}{" "}
                       at {formatSlotTime(selectedSlot.start, timezone)}
                     </p>
                     <p className="text-sm text-muted">
-                      We&apos;ll follow up at <strong>{email}</strong> with
-                      confirmation details. (Email automation wires in next.)
+                      {PUBLIC_BOOKING_COPY.confirmationPayment}
+                    </p>
+                    {confirmation ? (
+                      <div className="border border-line bg-paper-muted/60 px-3 py-3 text-sm text-ink-soft space-y-2">
+                        <p className="font-medium text-ink">
+                          {confirmation.format === "online"
+                            ? "Online lesson"
+                            : `In person · ${
+                                confirmation.area ||
+                                PUBLIC_BOOKING_COPY.confirmationInPersonArea
+                              }`}
+                        </p>
+                        {confirmation.format === "in_person" &&
+                        confirmation.address ? (
+                          <p className="text-ink whitespace-pre-line">
+                            {confirmation.address}
+                          </p>
+                        ) : null}
+                        <p>{confirmation.instructions}</p>
+                      </div>
+                    ) : null}
+                    <p className="text-sm text-muted">
+                      We&apos;ll also follow up at <strong>{email}</strong>.
                     </p>
                     <button type="button" className="btn-primary" onClick={onClose}>
                       Done
@@ -238,12 +266,50 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 ) : (
                   <form className="space-y-5" onSubmit={handleSubmit}>
                     <div className="border border-line bg-paper-muted/60 px-3 py-3 text-sm text-ink-soft">
-                      <p className="font-medium text-ink">Free 30-minute intro</p>
+                      <p className="font-medium text-ink">
+                        {PUBLIC_BOOKING_COPY.trialBannerTitle}
+                      </p>
                       <p className="text-muted mt-1 text-xs leading-relaxed">
-                        Online booking is the complimentary intro only. Paid 45-
-                        and 60-minute lessons will check out with Stripe soon.
+                        {PUBLIC_BOOKING_COPY.trialBannerBody}
                       </p>
                     </div>
+
+                    <fieldset className="space-y-2">
+                      <legend className="text-muted uppercase tracking-wider text-[11px] font-semibold">
+                        Lesson format
+                      </legend>
+                      <label className="flex items-start gap-3 border border-line bg-white px-3 py-3 cursor-pointer has-[:checked]:border-ink">
+                        <input
+                          type="radio"
+                          name="lesson-format"
+                          className="mt-1"
+                          checked={format === "in_person"}
+                          onChange={() => setFormat("in_person")}
+                        />
+                        <span>
+                          <span className="block text-ink text-sm font-medium">
+                            {PUBLIC_BOOKING_COPY.formatInPerson}
+                          </span>
+                        </span>
+                      </label>
+                      <label className="flex items-start gap-3 border border-line bg-white px-3 py-3 cursor-pointer has-[:checked]:border-ink">
+                        <input
+                          type="radio"
+                          name="lesson-format"
+                          className="mt-1"
+                          checked={format === "online"}
+                          onChange={() => setFormat("online")}
+                        />
+                        <span>
+                          <span className="block text-ink text-sm font-medium">
+                            {PUBLIC_BOOKING_COPY.formatOnline}
+                          </span>
+                        </span>
+                      </label>
+                      <p className="text-xs text-muted">
+                        {PUBLIC_BOOKING_COPY.formatSameRate}
+                      </p>
+                    </fieldset>
 
                     {loading ? (
                       <p className="text-sm text-muted py-6 text-center">

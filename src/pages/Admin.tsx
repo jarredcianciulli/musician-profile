@@ -320,7 +320,9 @@ const Admin: React.FC = () => {
                   }
                 />
                 <p className="text-xs text-muted mt-1">
-                  Public site books free 30-min intros only (Stripe for 45/60 next).
+                  Public site books the $35 / 30-min trial. Slot starts every 15
+                  minutes inside your published windows (Google free/busy when
+                  configured).
                 </p>
               </label>
             </div>
@@ -405,9 +407,14 @@ const Admin: React.FC = () => {
                       {formatSlotDay(b.start, tz)} ·{" "}
                       {formatSlotTime(b.start, tz)} ({b.durationMinutes} min)
                       {b.lessonType === "trial"
-                        ? " · free intro"
+                        ? " · trial"
                         : b.lessonType
                           ? ` · ${b.lessonType}`
+                          : ""}
+                      {b.format === "online"
+                        ? " · online"
+                        : b.format === "in_person"
+                          ? " · in person"
                           : ""}
                     </p>
                     <p className="text-sm text-muted">{b.email}</p>

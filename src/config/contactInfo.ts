@@ -1,8 +1,12 @@
 import { brand } from "./brand";
 
 const email =
-  process.env.REACT_APP_STUDIO_EMAIL || "hello@batterystringstudio.com";
+  process.env.REACT_APP_STUDIO_EMAIL || "jarred@batterystringstudio.com";
 
+/**
+ * Public location copy only — never put a street address here.
+ * Full street is a Worker secret and returned only after an in-person booking.
+ */
 export const contactInfo = {
   email,
   emailPersonal:
@@ -12,9 +16,10 @@ export const contactInfo = {
   city: "Charleston",
   state: "SC",
   area: "Charleston",
+  /** Public neighborhood — safe to show on the site */
+  neighborhood: "Bowan Village area",
   website: brand.website,
   websiteUrl: brand.websiteUrl,
-  /** In-site booking modal — Google Appointments deprecated (Phase 2). */
   bookingLink: "#book",
   social: {
     facebook: process.env.REACT_APP_FACEBOOK_URL || "https://facebook.com",

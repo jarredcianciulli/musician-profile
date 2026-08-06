@@ -1,21 +1,50 @@
 /**
- * Public online booking policy (Phase: free intro only).
- * Paid 45/60 + Stripe Checkout come next; keep those lengths in admin seeds.
+ * Public pricing & trial policy for Battery String Studio.
+ * Monthly rates = weekly lessons, holidays already baked in.
  */
 export const PUBLIC_TRIAL_MINUTES = 30;
+export const PUBLIC_TRIAL_PRICE = 35;
 export const PUBLIC_LESSON_TYPE = "trial" as const;
 
 export type PublicLessonType = typeof PUBLIC_LESSON_TYPE;
 export type LessonType = "trial" | "lesson";
+export type LessonFormat = "in_person" | "online";
+
+/** Weekly lesson lengths billed monthly */
+export const SUBSCRIPTION_DURATIONS = [30, 45, 60] as const;
+export type SubscriptionDuration = (typeof SUBSCRIPTION_DURATIONS)[number];
+
+export const SUBSCRIPTION_MONTHLY_RATES: Record<SubscriptionDuration, number> =
+  {
+    30: 160,
+    45: 220,
+    60: 310,
+  };
+
+export const DEFAULT_SUBSCRIPTION_MINUTES: SubscriptionDuration = 45;
 
 export const PUBLIC_BOOKING_COPY = {
-  cta: "Book free intro",
-  modalTitle: "Book a free intro",
-  modalSubtitle: "Complimentary 30-minute lesson — no payment required",
-  confirm: "Confirm free intro",
+  cta: "Book your trial",
+  modalTitle: "Book your trial",
+  modalSubtitle: "$35 · 30 minutes — meet me and try it out, no commitment",
+  confirm: "Confirm trial · $35",
   successTitle: "You're booked",
+  trialBannerTitle: "$35 trial · 30 minutes",
+  trialBannerBody:
+    "Meet me and try it out — no commitment. Pay $35 at the lesson (cash, Venmo, or card).",
+  formatSameRate: "Same rate either way.",
+  formatInPerson: "At my home studio (Bowan Village area)",
+  formatOnline: "Online (video lesson)",
+  subscriptionHeader:
+    "Weekly lessons, billed monthly. One simple rate that covers all your lessons for the year, holidays already accounted for.",
+  subscriptionFootnote:
+    "Same price every month, no surprise bills, six weeks off built in for holidays and summer.",
   paidComingSoon:
-    "Paid lessons will check out through Stripe soon. Book a free 30-minute intro for now.",
+    "Ongoing monthly lessons are set up after your trial. Book a $35 trial to get started.",
   alreadyBookedTrial:
-    "This email already has a free intro booked. Use Contact if you need to reschedule.",
+    "This email already has a trial booked. Use Contact if you need to reschedule.",
+  confirmationOnline:
+    "You'll get a video link by email before the lesson.",
+  confirmationInPersonArea: "Bowan Village area",
+  confirmationPayment: "Please bring or send $35 for the trial.",
 } as const;

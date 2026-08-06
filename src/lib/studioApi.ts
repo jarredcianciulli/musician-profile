@@ -7,7 +7,7 @@ import {
 } from "../types/studio";
 import { normalizeStudioPayload } from "./normalizeStudio";
 
-const LOCAL_KEY = "bss_studio_payload_v2";
+const LOCAL_KEY = "bss_studio_payload_v3";
 const TOKEN_KEY = "bss_admin_token";
 
 const apiBase = (process.env.REACT_APP_STUDIO_API || "").replace(/\/$/, "");

@@ -52,8 +52,10 @@ export type LessonBookingStatus =
   | "cancelled"
   | "pending_payment";
 
-/** trial = free intro (public now); lesson = paid (Stripe later) */
+/** trial = $35 intro; lesson = ongoing monthly (set up after trial) */
 export type LessonType = "trial" | "lesson";
+
+export type LessonFormat = "in_person" | "online";
 
 export type LessonBooking = {
   id: string;
@@ -63,9 +65,17 @@ export type LessonBooking = {
   email: string;
   notes?: string;
   lessonType: LessonType | string;
+  /** Where the lesson happens — set at booking only */
+  format?: LessonFormat;
   durationMinutes: number;
   status: LessonBookingStatus;
   createdAt: string;
+};
+
+/** Opaque busy interval (bookings or Google Calendar free/busy) */
+export type BusyInterval = {
+  start: string;
+  end: string;
 };
 
 export type StudioPayload = {

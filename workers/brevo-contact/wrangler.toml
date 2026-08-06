@@ -7,9 +7,9 @@ account_id = "6994f7f6c31b227cc8a0b96af83eb060"
 route = { pattern = "api.jarredcianciulli.com/contact", zone_name = "jarredcianciulli.com" }
 
 [vars]
-FROM_EMAIL = "me@jarredcianciulli.com"
-TO_EMAIL = "me@jarredcianciulli.com"
-WEBSITE_DOMAIN = "https://jarredcianciulli.com"
+FROM_EMAIL = "jarred@batterystringstudio.com"
+TO_EMAIL = "jarred@batterystringstudio.com"
+WEBSITE_DOMAIN = "https://batterystringstudio.com"
 
 [env.dev.vars]
 WEBSITE_DOMAIN = "http://localhost:3000"
