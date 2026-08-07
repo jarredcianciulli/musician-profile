@@ -2,19 +2,19 @@ name = "studio-api"
 main = "src/index.js"
 compatibility_date = "2024-11-07"
 
-account_id = "6994f7f6c31b227cc8a0b96af83eb060"
+# Christieandjarred account (owns batterystringstudio.com)
+account_id = "60fd79cf6ab3ec1f0525b598cfaef56b"
 
-# Primary BSS API host (site points REACT_APP_STUDIO_API here)
-routes = [
-  { pattern = "api.batterystringstudio.com/studio*", zone_name = "batterystringstudio.com" },
-  # Keep legacy host during transition
-  { pattern = "api.jarredcianciulli.com/studio*", zone_name = "jarredcianciulli.com" },
-]
+# Custom domain (Workers → Domains): booking-api.batterystringstudio.com
+# Prefer custom domain over zone routes — api.* is already used by the tunnel/Caddy stack.
+# Zone Workers Routes Edit is also required if you switch back to routes on api.*.
+# routes = [
+#   { pattern = "api.batterystringstudio.com/studio*", zone_name = "batterystringstudio.com" },
+# ]
 
-# Create with: npm run kv:create — then paste id below
-# [[kv_namespaces]]
-# binding = "STUDIO_KV"
-# id = "REPLACE_WITH_KV_NAMESPACE_ID"
+[[kv_namespaces]]
+binding = "STUDIO_KV"
+id = "628e269674a74751b113c64d7dbd7a33"
 
 [vars]
 WEBSITE_DOMAIN = "https://batterystringstudio.com"

@@ -6,6 +6,7 @@ import {
 import {
   createTrialCheckoutSession,
   createSubscriptionCheckoutSession,
+  retrieveCheckoutSession,
   verifyStripeWebhook,
 } from "./stripe.js";
 import { computeProration } from "./proration.js";
@@ -198,6 +199,76 @@ function confirmationDetails(env, format) {
   };
 }
 
+/** Mark trial booking paid from a completed Checkout session (webhook or return URL). */
+async function confirmTrialFromSession(env, payload, session) {
+  const meta = session?.metadata || {};
+  const bookingId = meta.bookingId || session.client_reference_id || "";
+  if (!bookingId) return { payload, booking: null };
+
+  let booking = null;
+  const bookings = (payload.bookings || []).map((b) => {
+    if (b.id !== bookingId) return b;
+    booking = {
+      ...b,
+      status: "scheduled",
+      stripeSessionId: session.id,
+      stripePaymentIntent:
+        typeof session.payment_intent === "string"
+          ? session.payment_intent
+          : session.payment_intent?.id || b.stripePaymentIntent,
+      paidAt: b.paidAt || new Date().toISOString(),
+    };
+    return booking;
+  });
+
+  if (!booking) return { payload, booking: null };
+
+  const next = {
+    ...payload,
+    bookings,
+    updatedAt: new Date().toISOString(),
+  };
+  await writePayload(env, next);
+  return { payload: next, booking };
+}
+
+async function confirmSubscriptionFromSession(env, payload, session) {
+  const meta = session?.metadata || {};
+  if (meta.type !== "subscription") return payload;
+
+  const subId =
+    typeof session.subscription === "string"
+      ? session.subscription
+      : session.subscription?.id;
+  const customerId =
+    typeof session.customer === "string"
+      ? session.customer
+      : session.customer?.id;
+
+  const existing = (payload.subscriptions || []).find(
+    (s) => s.stripeSubscriptionId && s.stripeSubscriptionId === subId
+  );
+  if (existing) return payload;
+
+  const record = {
+    id: newId("sub"),
+    stripeSubscriptionId: subId || "",
+    stripeCustomerId: customerId || "",
+    email: (session.customer_email || "").toLowerCase(),
+    name: meta.name || "",
+    durationMinutes: Number(meta.durationMinutes || 45),
+    status: "active",
+    createdAt: new Date().toISOString(),
+  };
+  const next = {
+    ...payload,
+    subscriptions: [...(payload.subscriptions || []), record],
+    updatedAt: new Date().toISOString(),
+  };
+  await writePayload(env, next);
+  return next;
+}
+
 function siteBase(env) {
   return (env.WEBSITE_DOMAIN || "https://batterystringstudio.com").replace(
     /\/$/,
@@ -267,55 +338,15 @@ export default {
       if (event.type === "checkout.session.completed") {
         const session = event.data?.object;
         const meta = session?.metadata || {};
-        const payload = await readPayload(env);
+        let payload = await readPayload(env);
 
         if (meta.type === "trial" || session?.client_reference_id) {
-          const bookingId =
-            meta.bookingId || session.client_reference_id || "";
-          const bookings = (payload.bookings || []).map((b) => {
-            if (b.id !== bookingId) return b;
-            return {
-              ...b,
-              status: "scheduled",
-              stripeSessionId: session.id,
-              stripePaymentIntent:
-                typeof session.payment_intent === "string"
-                  ? session.payment_intent
-                  : session.payment_intent?.id || b.stripePaymentIntent,
-              paidAt: new Date().toISOString(),
-            };
-          });
-          await writePayload(env, {
-            ...payload,
-            bookings,
-            updatedAt: new Date().toISOString(),
-          });
+          const result = await confirmTrialFromSession(env, payload, session);
+          payload = result.payload;
         }
 
         if (meta.type === "subscription") {
-          const subId =
-            typeof session.subscription === "string"
-              ? session.subscription
-              : session.subscription?.id;
-          const customerId =
-            typeof session.customer === "string"
-              ? session.customer
-              : session.customer?.id;
-          const record = {
-            id: newId("sub"),
-            stripeSubscriptionId: subId || "",
-            stripeCustomerId: customerId || "",
-            email: (session.customer_email || "").toLowerCase(),
-            name: meta.name || "",
-            durationMinutes: Number(meta.durationMinutes || 45),
-            status: "active",
-            createdAt: new Date().toISOString(),
-          };
-          await writePayload(env, {
-            ...payload,
-            subscriptions: [...(payload.subscriptions || []), record],
-            updatedAt: new Date().toISOString(),
-          });
+          await confirmSubscriptionFromSession(env, payload, session);
         }
       }
 
@@ -545,10 +576,36 @@ export default {
       if (!sessionId) {
         return json({ error: "session_id required" }, 400, origin);
       }
-      const payload = await readPayload(env);
-      const booking = (payload.bookings || []).find(
+      let payload = await readPayload(env);
+      let booking = (payload.bookings || []).find(
         (b) => b.stripeSessionId === sessionId
       );
+
+      // Webhook may lag (or be missing in the wrong Stripe mode).
+      // Confirm from Stripe when the visitor lands on the success URL.
+      if (!booking || booking.status !== "scheduled") {
+        try {
+          const session = await retrieveCheckoutSession(env, sessionId);
+          const paid =
+            session.payment_status === "paid" ||
+            session.status === "complete";
+          if (paid) {
+            const result = await confirmTrialFromSession(env, payload, session);
+            payload = result.payload;
+            booking = result.booking;
+            if (!booking) {
+              booking = (payload.bookings || []).find(
+                (b) =>
+                  b.stripeSessionId === sessionId ||
+                  b.id === (session.metadata?.bookingId || session.client_reference_id)
+              );
+            }
+          }
+        } catch (err) {
+          // Fall through to existing KV lookup / 404
+        }
+      }
+
       if (!booking) {
         return json({ error: "Booking not found" }, 404, origin);
       }

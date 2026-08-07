@@ -78,3 +78,25 @@
     transition: none !important;
   }
 }
+
+/* Trial day picker — brand tokens */
+.bss-daypicker {
+  --rdp-accent-color: var(--color-ink);
+  --rdp-accent-background-color: var(--color-paper-muted);
+  --rdp-today-color: var(--color-sky-deep);
+  --rdp-day-height: 2.35rem;
+  --rdp-day-width: 2.35rem;
+  --rdp-day_button-height: 2.2rem;
+  --rdp-day_button-width: 2.2rem;
+  --rdp-day_button-border-radius: 0.15rem;
+  font-family: inherit;
+}
+
+.bss-daypicker .rdp-root {
+  margin: 0 auto;
+}
+
+.bss-daypicker .rdp-day_button:disabled,
+.bss-daypicker .rdp-disabled {
+  opacity: 0.28;
+}

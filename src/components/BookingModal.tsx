@@ -1,7 +1,5 @@
-import React, { useEffect } from "react";
-import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
-import { analytics } from "../utils/analytics";
+import React from "react";
+import { useBooking } from "../context/BookingContext";
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -9,19 +7,15 @@ interface BookingModalProps {
   title?: string;
 }
 
-/** Opens the dedicated /trial flow (QR-friendly). Kept for existing callers. */
-const BookingModal: React.FC<BookingModalProps> = ({ isOpen, onClose }) => {
-  const navigate = useNavigate();
+/** @deprecated Prefer useBooking().openBooking() */
+const BookingModal: React.FC<BookingModalProps> = ({ isOpen }) => {
+  const { openBooking, isDesktopOpen } = useBooking();
 
-  useEffect(() => {
-    if (!isOpen) return;
-    analytics.bookingModalOpened("BookingModal → /trial");
-    onClose();
-    navigate("/trial");
-  }, [isOpen, navigate, onClose]);
+  React.useEffect(() => {
+    if (isOpen && !isDesktopOpen) openBooking("BookingModal");
+  }, [isOpen, isDesktopOpen, openBooking]);
 
-  if (!isOpen || typeof document === "undefined") return null;
-  return createPortal(null, document.body);
+  return null;
 };
 
 export default BookingModal;

@@ -6,8 +6,8 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        REACT_APP_CONTACT_ENDPOINT: ${REACT_APP_CONTACT_ENDPOINT:-https://api.batterystringstudio.com/contact}
-        REACT_APP_STUDIO_API: ${REACT_APP_STUDIO_API:-https://api.batterystringstudio.com}
+        REACT_APP_CONTACT_ENDPOINT: ${REACT_APP_CONTACT_ENDPOINT:-https://api.jarredcianciulli.com/contact}
+        REACT_APP_STUDIO_API: ${REACT_APP_STUDIO_API:-https://booking-api.batterystringstudio.com}
         REACT_APP_WEBSITE_DOMAIN: ${REACT_APP_WEBSITE_DOMAIN:-https://staging.batterystringstudio.com}
         REACT_APP_LAB_URL: ${REACT_APP_LAB_URL:-https://lab-staging.batterystringstudio.com}
         REACT_APP_METHOD_URL: ${REACT_APP_METHOD_URL:-https://method-staging.batterystringstudio.com}

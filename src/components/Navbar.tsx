@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { analytics } from "../utils/analytics";
 import { PUBLIC_BOOKING_COPY } from "../lib/bookingPolicy";
 import LogoLockup from "./brand/LogoLockup";
+import { useBooking } from "../context/BookingContext";
 
 const navLinks = [
   { id: "home", label: "Home" },
@@ -18,7 +18,7 @@ type Props = {
 };
 
 const Navbar: React.FC<Props> = ({ visible = true }) => {
-  const navigate = useNavigate();
+  const { openBooking } = useBooking();
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -28,10 +28,9 @@ const Navbar: React.FC<Props> = ({ visible = true }) => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const openBooking = (source: string) => {
-    analytics.bookingModalOpened(source);
+  const handleOpenBooking = (source: string) => {
     setIsOpen(false);
-    navigate("/trial");
+    openBooking(source);
   };
 
   const handleSmoothScroll = (
@@ -89,7 +88,7 @@ const Navbar: React.FC<Props> = ({ visible = true }) => {
 
           <div className="hidden lg:block">
             <button
-              onClick={() => openBooking("Navbar")}
+              onClick={() => handleOpenBooking("Navbar")}
               className="btn-primary"
             >
               {PUBLIC_BOOKING_COPY.cta}
@@ -128,7 +127,7 @@ const Navbar: React.FC<Props> = ({ visible = true }) => {
                 </a>
               ))}
               <button
-                onClick={() => openBooking("Mobile Menu")}
+                onClick={() => handleOpenBooking("Mobile Menu")}
                 className="btn-primary w-full mt-3"
               >
                 {PUBLIC_BOOKING_COPY.cta}

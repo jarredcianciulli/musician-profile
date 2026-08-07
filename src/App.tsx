@@ -11,6 +11,7 @@ import Home from "./pages/Home";
 import Admin from "./pages/Admin";
 import Trial from "./pages/Trial";
 import IntroSplash, { shouldPlayIntro } from "./components/brand/IntroSplash";
+import { BookingProvider } from "./context/BookingContext";
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -40,19 +41,21 @@ function PublicShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div className="App min-h-screen flex flex-col bg-paper">
-      {showIntro && <IntroSplash onComplete={finishIntro} />}
+    <BookingProvider>
+      <div className="App min-h-screen flex flex-col bg-paper">
+        {showIntro && <IntroSplash onComplete={finishIntro} />}
 
-      <div
-        className={`flex flex-col min-h-screen flex-grow transition-opacity duration-500 ${
-          ready ? "opacity-100" : "opacity-0"
-        }`}
-      >
-        <Navbar visible={ready} />
-        <main className="flex-grow">{children}</main>
-        <Footer />
+        <div
+          className={`flex flex-col min-h-screen flex-grow transition-opacity duration-500 ${
+            ready ? "opacity-100" : "opacity-0"
+          }`}
+        >
+          <Navbar visible={ready} />
+          <main className="flex-grow">{children}</main>
+          <Footer />
+        </div>
       </div>
-    </div>
+    </BookingProvider>
   );
 }
 

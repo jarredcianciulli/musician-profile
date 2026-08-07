@@ -79,16 +79,17 @@ npx wrangler secret put STRIPE_WEBHOOK_SECRET
 npx wrangler deploy
 ```
 
-Routes: `api.batterystringstudio.com/studio*` (+ legacy jarred host).  
+Custom domain: `booking-api.batterystringstudio.com` (Workers Domains).  
+`api.batterystringstudio.com` stays on the tunnel/Caddy stack.  
 CORS: apex, www, staging, localhost.  
-Stripe webhook: `https://api.batterystringstudio.com/studio/booking/webhook`  
+Stripe webhook: `https://booking-api.batterystringstudio.com/studio/booking/webhook`  
 Flyer QR: `https://batterystringstudio.com/trial`
 
 Site `REACT_APP_*` on Pi `~/bss/studio/prod/.env`:
 
 ```bash
-REACT_APP_CONTACT_ENDPOINT=https://api.batterystringstudio.com/contact
-REACT_APP_STUDIO_API=https://api.batterystringstudio.com
+REACT_APP_CONTACT_ENDPOINT=https://api.jarredcianciulli.com/contact
+REACT_APP_STUDIO_API=https://booking-api.batterystringstudio.com
 REACT_APP_WEBSITE_DOMAIN=https://batterystringstudio.com
 REACT_APP_LAB_URL=https://lab.batterystringstudio.com
 REACT_APP_METHOD_URL=https://method.batterystringstudio.com

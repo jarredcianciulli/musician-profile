@@ -56,6 +56,14 @@ export async function stripeRequest(env, method, path, body) {
   return data;
 }
 
+export async function retrieveCheckoutSession(env, sessionId) {
+  return stripeRequest(
+    env,
+    "GET",
+    `/checkout/sessions/${encodeURIComponent(sessionId)}`
+  );
+}
+
 export async function createTrialCheckoutSession(env, {
   bookingId,
   email,

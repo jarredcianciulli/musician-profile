@@ -1,7 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
 import { contactInfo } from "../config/contactInfo";
-import { analytics } from "../utils/analytics";
 import {
   DEFAULT_SUBSCRIPTION_MINUTES,
   PUBLIC_BOOKING_COPY,
@@ -13,8 +11,10 @@ import {
 } from "../lib/bookingPolicy";
 import { computeProration } from "../lib/subscriptionProration";
 import { startSubscriptionCheckout } from "../lib/bookingApi";
+import { useBooking } from "../context/BookingContext";
 
 const Lessons: React.FC = () => {
+  const { openBooking } = useBooking();
   const [duration, setDuration] = useState<SubscriptionDuration>(
     DEFAULT_SUBSCRIPTION_MINUTES
   );
@@ -100,15 +100,13 @@ const Lessons: React.FC = () => {
                   No subscription required to book
                 </li>
               </ul>
-              <Link
-                to="/trial"
-                onClick={() =>
-                  analytics.bookingModalOpened("Lessons Section - Trial")
-                }
+              <button
+                type="button"
+                onClick={() => openBooking("Lessons Section - Trial")}
                 className="btn-primary w-full text-center"
               >
                 {PUBLIC_BOOKING_COPY.cta}
-              </Link>
+              </button>
             </div>
           </div>
 
@@ -158,9 +156,10 @@ const Lessons: React.FC = () => {
               </p>
               <p className="text-sm text-ink-soft mb-6">
                 Starting mid-month: about{" "}
-                <strong>${proration.prorateDollars}</strong> for{" "}
-                {proration.remainingLessons} remaining lesson
-                {proration.remainingLessons === 1 ? "" : "s"} this month, then $
+                <strong>${proration.prorateDollars}</strong> for roughly{" "}
+                {proration.remainingLessons} lesson
+                {proration.remainingLessons === 1 ? "" : "s"} left this month
+                (exact amount depends on which day you take), then $
                 {monthlyPrice}/mo.
               </p>
 

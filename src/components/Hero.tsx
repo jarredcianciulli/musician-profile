@@ -1,12 +1,14 @@
 import React from "react";
-import { Link } from "react-router-dom";
 import { contactInfo } from "../config/contactInfo";
 import { brand } from "../config/brand";
 import { analytics } from "../utils/analytics";
 import { PUBLIC_BOOKING_COPY } from "../lib/bookingPolicy";
+import { useBooking } from "../context/BookingContext";
 import heroImage from "../assets/headshots/home3.webp";
 
 const Hero: React.FC = () => {
+  const { openBooking } = useBooking();
+
   return (
     <section
       id="home"
@@ -42,13 +44,13 @@ const Hero: React.FC = () => {
                 </p>
 
                 <div className="flex flex-row gap-4">
-                  <Link
-                    to="/trial"
-                    onClick={() => analytics.bookingModalOpened("Hero Section")}
+                  <button
+                    type="button"
+                    onClick={() => openBooking("Hero Section")}
                     className="btn-primary flex-1 sm:flex-none whitespace-nowrap text-sm text-center"
                   >
                     {PUBLIC_BOOKING_COPY.cta}
-                  </Link>
+                  </button>
                   <button
                     onClick={() => {
                       analytics.learnMoreClicked("Hero Section");
