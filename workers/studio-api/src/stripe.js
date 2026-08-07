@@ -166,9 +166,11 @@ export async function createSubscriptionCheckoutSession(env, {
     },
   };
 
+  // Mid-month: charge one-time proration now, first recurring invoice at next
+  // month. Do NOT set billing_cycle_anchor + proration_behavior=none — Stripe
+  // rejects that combo when line_items include a one-time price.
   if (billingCycleAnchor) {
-    body.subscription_data.billing_cycle_anchor = billingCycleAnchor;
-    body.subscription_data.proration_behavior = "none";
+    body.subscription_data.trial_end = billingCycleAnchor;
   }
 
   return stripeRequest(env, "POST", "/checkout/sessions", body);
