@@ -1,14 +1,12 @@
-import React, { useState } from "react";
+import React from "react";
+import { Link } from "react-router-dom";
 import { contactInfo } from "../config/contactInfo";
 import { brand } from "../config/brand";
 import { analytics } from "../utils/analytics";
 import { PUBLIC_BOOKING_COPY } from "../lib/bookingPolicy";
 import heroImage from "../assets/headshots/home3.webp";
-import BookingModal from "./BookingModal";
 
 const Hero: React.FC = () => {
-  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
-
   return (
     <section
       id="home"
@@ -44,15 +42,13 @@ const Hero: React.FC = () => {
                 </p>
 
                 <div className="flex flex-row gap-4">
-                  <button
-                    onClick={() => {
-                      analytics.bookingModalOpened("Hero Section");
-                      setIsBookingModalOpen(true);
-                    }}
-                    className="btn-primary flex-1 sm:flex-none whitespace-nowrap text-sm"
+                  <Link
+                    to="/trial"
+                    onClick={() => analytics.bookingModalOpened("Hero Section")}
+                    className="btn-primary flex-1 sm:flex-none whitespace-nowrap text-sm text-center"
                   >
                     {PUBLIC_BOOKING_COPY.cta}
-                  </button>
+                  </Link>
                   <button
                     onClick={() => {
                       analytics.learnMoreClicked("Hero Section");
@@ -92,11 +88,6 @@ const Hero: React.FC = () => {
       </div>
 
       <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-b from-transparent to-paper pointer-events-none" />
-
-      <BookingModal
-        isOpen={isBookingModalOpen}
-        onClose={() => setIsBookingModalOpen(false)}
-      />
     </section>
   );
 };

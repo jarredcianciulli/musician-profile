@@ -9,6 +9,7 @@ import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import Home from "./pages/Home";
 import Admin from "./pages/Admin";
+import Trial from "./pages/Trial";
 import IntroSplash, { shouldPlayIntro } from "./components/brand/IntroSplash";
 
 function ScrollToTop() {
@@ -75,6 +76,7 @@ function App() {
             </PublicShell>
           }
         />
+        <Route path="/trial" element={<Trial />} />
         <Route path="/admin" element={<Admin />} />
       </Routes>
     </Router>

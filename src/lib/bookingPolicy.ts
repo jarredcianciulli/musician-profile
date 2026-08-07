@@ -1,6 +1,5 @@
 /**
  * Public pricing & trial policy for Battery String Studio.
- * Monthly rates = weekly lessons, holidays already baked in.
  */
 export const PUBLIC_TRIAL_MINUTES = 30;
 export const PUBLIC_TRIAL_PRICE = 35;
@@ -10,7 +9,6 @@ export type PublicLessonType = typeof PUBLIC_LESSON_TYPE;
 export type LessonType = "trial" | "lesson";
 export type LessonFormat = "in_person" | "online";
 
-/** Weekly lesson lengths billed monthly */
 export const SUBSCRIPTION_DURATIONS = [30, 45, 60] as const;
 export type SubscriptionDuration = (typeof SUBSCRIPTION_DURATIONS)[number];
 
@@ -27,11 +25,11 @@ export const PUBLIC_BOOKING_COPY = {
   cta: "Book your trial",
   modalTitle: "Book your trial",
   modalSubtitle: "$35 · 30 minutes — meet me and try it out, no commitment",
-  confirm: "Confirm trial · $35",
+  confirm: "Pay $35 & book",
   successTitle: "You're booked",
   trialBannerTitle: "$35 trial · 30 minutes",
   trialBannerBody:
-    "Meet me and try it out — no commitment. Pay $35 at the lesson (cash, Venmo, or card).",
+    "Meet me and try it out — no commitment. You'll pay $35 securely with Stripe to confirm your time.",
   formatSameRate: "Same rate either way.",
   formatInPerson: "At my home studio (Bowan Village area)",
   formatOnline: "Online (video lesson)",
@@ -46,5 +44,9 @@ export const PUBLIC_BOOKING_COPY = {
   confirmationOnline:
     "You'll get a video link by email before the lesson.",
   confirmationInPersonArea: "Bowan Village area",
-  confirmationPayment: "Please bring or send $35 for the trial.",
+  confirmationPayment: "Your $35 trial payment is confirmed.",
+  stepFormat: "Format",
+  stepTime: "Time",
+  stepDetails: "Details",
+  stepReview: "Pay",
 } as const;

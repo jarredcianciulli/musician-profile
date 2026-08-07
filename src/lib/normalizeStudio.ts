@@ -31,6 +31,9 @@ export function normalizeStudioPayload(
     events: payload.events || seed.events,
     availability: normalizeAvailability(payload.availability),
     bookings: Array.isArray(payload.bookings) ? payload.bookings : [],
+    subscriptions: Array.isArray(payload.subscriptions)
+      ? payload.subscriptions
+      : [],
     updatedAt: payload.updatedAt || new Date().toISOString(),
   };
 }

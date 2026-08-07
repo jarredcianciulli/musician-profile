@@ -19,6 +19,7 @@ import {
   rangeForDays,
 } from "./slots";
 import { contactInfo } from "../config/contactInfo";
+import { ProrationResult } from "./subscriptionProration";
 
 export { dayKey, formatSlotDay, formatSlotTime };
 
@@ -80,133 +81,159 @@ export async function fetchAvailableSlots(options?: {
   };
 }
 
-export type CreateBookingInput = {
+export type CheckoutTrialInput = {
   start: string;
   end: string;
   name: string;
   email: string;
   notes?: string;
-  durationMinutes: number;
-  lessonType?: string;
   format: LessonFormat;
 };
 
-export type CreateBookingResult = {
-  booking: LessonBooking;
-  confirmation?: BookingConfirmation;
-  email?: { ok: boolean; error?: string };
+export type CheckoutTrialResult = {
+  url: string;
+  sessionId: string;
+  bookingId: string;
 };
 
-function localConfirmation(format: LessonFormat): BookingConfirmation {
-  if (format === "online") {
-    return {
-      format: "online",
-      instructions: PUBLIC_BOOKING_COPY.confirmationOnline,
-    };
-  }
-  return {
-    format: "in_person",
-    area: contactInfo.neighborhood,
-    address: null,
-    instructions: `Lessons are at the home studio in the ${contactInfo.neighborhood}. The full address will arrive in your confirmation email.`,
-  };
-}
-
-export async function createBooking(
-  input: CreateBookingInput
-): Promise<CreateBookingResult> {
-  const lessonType = input.lessonType || PUBLIC_LESSON_TYPE;
-  const durationMinutes = Number(input.durationMinutes);
-  const format = input.format;
-
-  if (format !== "in_person" && format !== "online") {
+export async function startTrialCheckout(
+  input: CheckoutTrialInput
+): Promise<CheckoutTrialResult> {
+  if (input.format !== "in_person" && input.format !== "online") {
     throw new Error("Choose a lesson format: at the home studio or online.");
   }
 
-  if (lessonType === "lesson") {
-    throw new Error(PUBLIC_BOOKING_COPY.paidComingSoon);
-  }
-  if (
-    lessonType !== PUBLIC_LESSON_TYPE ||
-    durationMinutes !== PUBLIC_TRIAL_MINUTES
-  ) {
-    throw new Error(
-      "Only the $35 / 30-minute trial is bookable online right now."
+  if (!apiBase) {
+    // Local fallback: save pending booking and skip Stripe
+    const studio = normalizeStudioPayload(
+      await loadStudio({ includePrivate: true })
     );
-  }
+    const emailNorm = input.email.trim().toLowerCase();
+    const hasTrial = studio.bookings.some(
+      (b) =>
+        b.email === emailNorm &&
+        b.lessonType === PUBLIC_LESSON_TYPE &&
+        b.status !== "cancelled"
+    );
+    if (hasTrial) throw new Error(PUBLIC_BOOKING_COPY.alreadyBookedTrial);
 
-  const payload = {
-    ...input,
-    lessonType: PUBLIC_LESSON_TYPE,
-    durationMinutes: PUBLIC_TRIAL_MINUTES,
-    format,
-  };
-
-  if (apiBase) {
-    const res = await fetch(`${apiBase}/studio/booking`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+    const open = generateAvailableSlots({
+      from: input.start,
+      to: new Date(new Date(input.end).getTime() + 1000).toISOString(),
+      durationMinutes: PUBLIC_TRIAL_MINUTES,
+      availability: studio.availability,
+      holidays: studio.holidays,
+      bookings: studio.bookings,
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data.error || "Booking failed. Please try another time.");
+    if (!open.some((s) => s.start === input.start)) {
+      throw new Error("That time was just taken. Please pick another slot.");
     }
-    return data as CreateBookingResult;
+
+    const booking: LessonBooking = {
+      id: newId("booking"),
+      start: input.start,
+      end: input.end,
+      name: input.name.trim(),
+      email: emailNorm,
+      notes: input.notes?.trim() || "",
+      lessonType: PUBLIC_LESSON_TYPE,
+      format: input.format,
+      durationMinutes: PUBLIC_TRIAL_MINUTES,
+      status: "scheduled",
+      amountCents: 3500,
+      paidAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+    await saveStudio({
+      ...studio,
+      bookings: [...studio.bookings, booking],
+    });
+    return {
+      url: `/trial?success=1&local=1&booking=${booking.id}`,
+      sessionId: "local",
+      bookingId: booking.id,
+    };
   }
 
-  const studio = normalizeStudioPayload(
-    await loadStudio({ includePrivate: true })
-  );
-  const emailNorm = input.email.trim().toLowerCase();
-
-  const hasTrial = studio.bookings.some(
-    (b) =>
-      b.email === emailNorm &&
-      b.lessonType === PUBLIC_LESSON_TYPE &&
-      b.status !== "cancelled"
-  );
-  if (hasTrial) {
-    throw new Error(PUBLIC_BOOKING_COPY.alreadyBookedTrial);
-  }
-
-  const open = generateAvailableSlots({
-    from: input.start,
-    to: new Date(new Date(input.end).getTime() + 1000).toISOString(),
-    durationMinutes: PUBLIC_TRIAL_MINUTES,
-    availability: studio.availability,
-    holidays: studio.holidays,
-    bookings: studio.bookings,
+  const res = await fetch(`${apiBase}/studio/booking/checkout`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...input,
+      lessonType: PUBLIC_LESSON_TYPE,
+      durationMinutes: PUBLIC_TRIAL_MINUTES,
+    }),
   });
-  const stillOpen = open.some((s) => s.start === input.start);
-  if (!stillOpen) {
-    throw new Error("That time was just taken. Please pick another slot.");
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not start checkout.");
   }
+  return data as CheckoutTrialResult;
+}
 
-  const booking: LessonBooking = {
-    id: newId("booking"),
-    start: input.start,
-    end: input.end,
-    name: input.name.trim(),
-    email: emailNorm,
-    notes: input.notes?.trim() || "",
-    lessonType: PUBLIC_LESSON_TYPE,
-    format,
-    durationMinutes: PUBLIC_TRIAL_MINUTES,
-    status: "scheduled",
-    createdAt: new Date().toISOString(),
-  };
+export async function fetchBookingBySession(
+  sessionId: string
+): Promise<{
+  booking: LessonBooking;
+  confirmation: BookingConfirmation | null;
+}> {
+  if (!apiBase || sessionId === "local") {
+    return {
+      booking: {
+        id: "local",
+        start: "",
+        end: "",
+        name: "",
+        email: "",
+        lessonType: "trial",
+        durationMinutes: 30,
+        status: "scheduled",
+        createdAt: new Date().toISOString(),
+      },
+      confirmation: {
+        format: "in_person",
+        area: contactInfo.neighborhood,
+        address: null,
+        instructions: `Lessons are at the home studio in the ${contactInfo.neighborhood}. (Local demo — no Stripe.)`,
+      },
+    };
+  }
+  const res = await fetch(
+    `${apiBase}/studio/booking/session?session_id=${encodeURIComponent(
+      sessionId
+    )}`
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not load booking.");
+  }
+  return data;
+}
 
-  await saveStudio({
-    ...studio,
-    bookings: [...studio.bookings, booking],
+export async function startSubscriptionCheckout(input: {
+  name: string;
+  email: string;
+  durationMinutes: 30 | 45 | 60;
+  startDate?: string;
+}): Promise<{ url: string; proration: ProrationResult }> {
+  if (!apiBase) {
+    throw new Error("Subscription checkout requires the studio API.");
+  }
+  const res = await fetch(`${apiBase}/studio/subscription/checkout`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
   });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not start subscription checkout.");
+  }
+  return data;
+}
 
-  return {
-    booking,
-    confirmation: localConfirmation(format),
-    email: { ok: true },
-  };
+/** @deprecated use startTrialCheckout */
+export async function createBooking() {
+  throw new Error("Use Pay $35 checkout on /trial instead.");
 }
 
 export async function listBookingsAdmin(): Promise<LessonBooking[]> {

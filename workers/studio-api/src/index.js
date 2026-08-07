@@ -3,11 +3,17 @@ import {
   fetchGoogleBusyIntervals,
   googleCalendarConfigured,
 } from "./googleCalendar.js";
+import {
+  createTrialCheckoutSession,
+  createSubscriptionCheckoutSession,
+  verifyStripeWebhook,
+} from "./stripe.js";
+import { computeProration } from "./proration.js";
 
 const STORE_KEY = "studio_payload_v2";
 
-/** Public online booking: $35 / 30-min trial */
 const PUBLIC_TRIAL_MINUTES = 30;
+const PUBLIC_TRIAL_PRICE_CENTS = 3500;
 const PUBLIC_LESSON_TYPE = "trial";
 const PUBLIC_FORMATS = new Set(["in_person", "online"]);
 
@@ -18,12 +24,12 @@ const defaultAvailability = {
   defaultDurationMinutes: 30,
   weeklyHours: [
     { day: 0, start: "10:00", end: "14:00", enabled: false },
-    { day: 1, start: "18:00", end: "20:00", enabled: true }, // Mon 6–8pm ET
+    { day: 1, start: "18:00", end: "20:00", enabled: true },
     { day: 2, start: "15:00", end: "20:00", enabled: false },
     { day: 3, start: "15:00", end: "20:00", enabled: false },
     { day: 4, start: "15:00", end: "20:00", enabled: false },
     { day: 5, start: "15:00", end: "20:00", enabled: false },
-    { day: 6, start: "08:00", end: "11:00", enabled: true }, // Sat 8–11am ET
+    { day: 6, start: "08:00", end: "11:00", enabled: true },
   ],
 };
 
@@ -31,6 +37,7 @@ const seed = {
   updatedAt: new Date().toISOString(),
   availability: defaultAvailability,
   bookings: [],
+  subscriptions: [],
   holidays: [
     {
       id: "holiday-thanksgiving-2026",
@@ -72,10 +79,23 @@ const seed = {
   ],
 };
 
+function resolveCorsOrigin(request, env) {
+  const reqOrigin = request.headers.get("Origin") || "";
+  const allowed = String(env.CORS_ORIGINS || env.WEBSITE_DOMAIN || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (reqOrigin && allowed.includes(reqOrigin)) return reqOrigin;
+  if (allowed.length) return allowed[0];
+  return env.WEBSITE_DOMAIN || "*";
+}
+
 const corsHeaders = (origin) => ({
   "Access-Control-Allow-Origin": origin || "*",
   "Access-Control-Allow-Methods": "GET, PUT, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, Stripe-Signature",
+  "Access-Control-Allow-Credentials": "true",
+  Vary: "Origin",
 });
 
 function json(data, status, origin) {
@@ -109,6 +129,7 @@ function normalizePayload(raw) {
           : base.availability.weeklyHours,
     },
     bookings: Array.isArray(raw.bookings) ? raw.bookings : [],
+    subscriptions: Array.isArray(raw.subscriptions) ? raw.subscriptions : [],
     updatedAt: raw.updatedAt || new Date().toISOString(),
   };
 }
@@ -159,13 +180,11 @@ function publicStudio(payload) {
   };
 }
 
-/** Street address never goes in public studio GET — only post-booking for in-person. */
 function confirmationDetails(env, format) {
   if (format === "online") {
     return {
       format: "online",
-      instructions:
-        "You'll get a video link by email before the lesson.",
+      instructions: "You'll get a video link by email before the lesson.",
     };
   }
   const street = (env.STUDIO_STREET_ADDRESS || "").trim();
@@ -179,9 +198,43 @@ function confirmationDetails(env, format) {
   };
 }
 
+function siteBase(env) {
+  return (env.WEBSITE_DOMAIN || "https://batterystringstudio.com").replace(
+    /\/$/,
+    ""
+  );
+}
+
+function activeTrialExists(bookings, emailNorm) {
+  return (bookings || []).some(
+    (b) =>
+      b.email === emailNorm &&
+      b.lessonType === PUBLIC_LESSON_TYPE &&
+      b.status !== "cancelled"
+  );
+}
+
+async function assertSlotOpen(env, payload, start, end) {
+  const busyIntervals = await fetchGoogleBusyIntervals(
+    env,
+    start,
+    new Date(new Date(end).getTime() + 1000).toISOString()
+  );
+  const open = generateAvailableSlots({
+    from: start,
+    to: new Date(new Date(end).getTime() + 1000).toISOString(),
+    durationMinutes: PUBLIC_TRIAL_MINUTES,
+    availability: payload.availability,
+    holidays: payload.holidays,
+    bookings: payload.bookings,
+    busyIntervals,
+  });
+  return open.some((s) => s.start === start);
+}
+
 export default {
   async fetch(request, env) {
-    const origin = env.WEBSITE_DOMAIN || "*";
+    const origin = resolveCorsOrigin(request, env);
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/$/, "") || "/";
 
@@ -190,6 +243,84 @@ export default {
     }
 
     const route = path.startsWith("/studio") ? path : `/studio${path}`;
+
+    // Stripe webhook — no CORS origin required
+    if (request.method === "POST" && route === "/studio/booking/webhook") {
+      const rawBody = await request.text();
+      const sig = request.headers.get("Stripe-Signature") || "";
+      const ok = await verifyStripeWebhook(
+        rawBody,
+        sig,
+        env.STRIPE_WEBHOOK_SECRET
+      );
+      if (!ok) {
+        return json({ error: "Invalid webhook signature" }, 400, origin);
+      }
+
+      let event;
+      try {
+        event = JSON.parse(rawBody);
+      } catch {
+        return json({ error: "Invalid JSON" }, 400, origin);
+      }
+
+      if (event.type === "checkout.session.completed") {
+        const session = event.data?.object;
+        const meta = session?.metadata || {};
+        const payload = await readPayload(env);
+
+        if (meta.type === "trial" || session?.client_reference_id) {
+          const bookingId =
+            meta.bookingId || session.client_reference_id || "";
+          const bookings = (payload.bookings || []).map((b) => {
+            if (b.id !== bookingId) return b;
+            return {
+              ...b,
+              status: "scheduled",
+              stripeSessionId: session.id,
+              stripePaymentIntent:
+                typeof session.payment_intent === "string"
+                  ? session.payment_intent
+                  : session.payment_intent?.id || b.stripePaymentIntent,
+              paidAt: new Date().toISOString(),
+            };
+          });
+          await writePayload(env, {
+            ...payload,
+            bookings,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+
+        if (meta.type === "subscription") {
+          const subId =
+            typeof session.subscription === "string"
+              ? session.subscription
+              : session.subscription?.id;
+          const customerId =
+            typeof session.customer === "string"
+              ? session.customer
+              : session.customer?.id;
+          const record = {
+            id: newId("sub"),
+            stripeSubscriptionId: subId || "",
+            stripeCustomerId: customerId || "",
+            email: (session.customer_email || "").toLowerCase(),
+            name: meta.name || "",
+            durationMinutes: Number(meta.durationMinutes || 45),
+            status: "active",
+            createdAt: new Date().toISOString(),
+          };
+          await writePayload(env, {
+            ...payload,
+            subscriptions: [...(payload.subscriptions || []), record],
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+
+      return json({ received: true }, 200, origin);
+    }
 
     if (request.method === "POST" && route === "/studio/auth") {
       let body;
@@ -221,27 +352,26 @@ export default {
       if (!env.ADMIN_TOKEN || token !== env.ADMIN_TOKEN) {
         return json({ error: "Unauthorized" }, 401, origin);
       }
-
       let body;
       try {
         body = await request.json();
       } catch {
         return json({ error: "Invalid JSON" }, 400, origin);
       }
-
       const current = await readPayload(env);
       const next = normalizePayload({
         holidays: body.holidays,
         events: body.events,
         availability: body.availability || current.availability,
         bookings: Array.isArray(body.bookings) ? body.bookings : current.bookings,
+        subscriptions: Array.isArray(body.subscriptions)
+          ? body.subscriptions
+          : current.subscriptions,
         updatedAt: new Date().toISOString(),
       });
-
       if (!isValidPayload(next)) {
         return json({ error: "Invalid studio payload" }, 400, origin);
       }
-
       try {
         await writePayload(env, next);
       } catch (error) {
@@ -251,22 +381,17 @@ export default {
           origin
         );
       }
-
       return json(next, 200, origin);
     }
 
-    // --- Booking: public slots ($35 trial, Google free/busy when configured) ---
     if (request.method === "GET" && route === "/studio/booking/slots") {
       const payload = await readPayload(env);
       const durationMinutes = PUBLIC_TRIAL_MINUTES;
-      const from =
-        url.searchParams.get("from") || new Date().toISOString();
+      const from = url.searchParams.get("from") || new Date().toISOString();
       const toDefault = new Date();
       toDefault.setDate(toDefault.getDate() + 14);
       const to = url.searchParams.get("to") || toDefault.toISOString();
-
       const busyIntervals = await fetchGoogleBusyIntervals(env, from, to);
-
       const slots = generateAvailableSlots({
         from,
         to,
@@ -276,17 +401,14 @@ export default {
         bookings: payload.bookings,
         busyIntervals,
       });
-
-      const availability = {
-        ...publicStudio(payload).availability,
-        defaultDurationMinutes: PUBLIC_TRIAL_MINUTES,
-        durationsMinutes: [PUBLIC_TRIAL_MINUTES],
-      };
-
       return json(
         {
           slots,
-          availability,
+          availability: {
+            ...publicStudio(payload).availability,
+            defaultDurationMinutes: PUBLIC_TRIAL_MINUTES,
+            durationsMinutes: [PUBLIC_TRIAL_MINUTES],
+          },
           calendarSync: googleCalendarConfigured(env),
         },
         200,
@@ -294,8 +416,8 @@ export default {
       );
     }
 
-    // --- Booking: create trial ---
-    if (request.method === "POST" && route === "/studio/booking") {
+    // Start Stripe Checkout for $35 trial
+    if (request.method === "POST" && route === "/studio/booking/checkout") {
       let body;
       try {
         body = await request.json();
@@ -303,11 +425,7 @@ export default {
         return json({ error: "Invalid JSON" }, 400, origin);
       }
 
-      const { start, end, name, email, notes = "" } = body || {};
-      const lessonType = String(body?.lessonType || PUBLIC_LESSON_TYPE);
-      const durationMinutes = Number(body?.durationMinutes || PUBLIC_TRIAL_MINUTES);
-      const format = String(body?.format || "");
-
+      const { start, end, name, email, notes = "", format } = body || {};
       if (!start || !end || !name?.trim() || !email?.trim()) {
         return json(
           { error: "Name, email, start, and end are required." },
@@ -315,37 +433,9 @@ export default {
           origin
         );
       }
-
-      if (!PUBLIC_FORMATS.has(format)) {
+      if (!PUBLIC_FORMATS.has(String(format))) {
         return json(
-          {
-            error:
-              "Choose a lesson format: at the home studio or online.",
-          },
-          400,
-          origin
-        );
-      }
-
-      if (lessonType === "lesson") {
-        return json(
-          {
-            error:
-              "Ongoing monthly lessons are set up after your trial. Book a $35 trial to get started.",
-          },
-          501,
-          origin
-        );
-      }
-
-      if (
-        lessonType !== PUBLIC_LESSON_TYPE ||
-        durationMinutes !== PUBLIC_TRIAL_MINUTES
-      ) {
-        return json(
-          {
-            error: "Only the $35 / 30-minute trial is bookable online right now.",
-          },
+          { error: "Choose a lesson format: at the home studio or online." },
           400,
           origin
         );
@@ -353,14 +443,7 @@ export default {
 
       const payload = await readPayload(env);
       const emailNorm = String(email).trim().toLowerCase();
-
-      const hasTrial = (payload.bookings || []).some(
-        (b) =>
-          b.email === emailNorm &&
-          b.lessonType === PUBLIC_LESSON_TYPE &&
-          b.status !== "cancelled"
-      );
-      if (hasTrial) {
+      if (activeTrialExists(payload.bookings, emailNorm)) {
         return json(
           {
             error:
@@ -371,23 +454,8 @@ export default {
         );
       }
 
-      const busyIntervals = await fetchGoogleBusyIntervals(
-        env,
-        start,
-        new Date(new Date(end).getTime() + 1000).toISOString()
-      );
-
-      const open = generateAvailableSlots({
-        from: start,
-        to: new Date(new Date(end).getTime() + 1000).toISOString(),
-        durationMinutes: PUBLIC_TRIAL_MINUTES,
-        availability: payload.availability,
-        holidays: payload.holidays,
-        bookings: payload.bookings,
-        busyIntervals,
-      });
-
-      if (!open.some((s) => s.start === start)) {
+      const open = await assertSlotOpen(env, payload, start, end);
+      if (!open) {
         return json(
           { error: "That time was just taken. Please pick another slot." },
           409,
@@ -395,28 +463,28 @@ export default {
         );
       }
 
+      const bookingId = newId("booking");
       const booking = {
-        id: newId("booking"),
+        id: bookingId,
         start,
         end,
         name: String(name).trim(),
         email: emailNorm,
         notes: String(notes || "").trim(),
         lessonType: PUBLIC_LESSON_TYPE,
-        format,
+        format: String(format),
         durationMinutes: PUBLIC_TRIAL_MINUTES,
-        status: "scheduled",
+        status: "pending_payment",
+        amountCents: PUBLIC_TRIAL_PRICE_CENTS,
         createdAt: new Date().toISOString(),
       };
 
-      const next = {
-        ...payload,
-        bookings: [...payload.bookings, booking],
-        updatedAt: new Date().toISOString(),
-      };
-
       try {
-        await writePayload(env, next);
+        await writePayload(env, {
+          ...payload,
+          bookings: [...payload.bookings, booking],
+          updatedAt: new Date().toISOString(),
+        });
       } catch (error) {
         return json(
           { error: error.message || "Failed to save booking" },
@@ -425,17 +493,182 @@ export default {
         );
       }
 
-      const confirmation = confirmationDetails(env, format);
+      if (!env.STRIPE_SECRET_KEY) {
+        return json(
+          {
+            error:
+              "Stripe is not configured yet. Set STRIPE_SECRET_KEY on studio-api.",
+            booking,
+          },
+          503,
+          origin
+        );
+      }
 
+      const base = siteBase(env);
+      try {
+        const session = await createTrialCheckoutSession(env, {
+          bookingId,
+          email: emailNorm,
+          name: booking.name,
+          successUrl: `${base}/trial?success=1&session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${base}/trial?canceled=1`,
+          metadata: { format: String(format) },
+        });
+
+        const fresh = await readPayload(env);
+        await writePayload(env, {
+          ...fresh,
+          bookings: fresh.bookings.map((b) =>
+            b.id === bookingId ? { ...b, stripeSessionId: session.id } : b
+          ),
+          updatedAt: new Date().toISOString(),
+        });
+
+        return json(
+          { url: session.url, sessionId: session.id, bookingId },
+          200,
+          origin
+        );
+      } catch (error) {
+        return json(
+          { error: error.message || "Could not start checkout." },
+          502,
+          origin
+        );
+      }
+    }
+
+    // Confirm booking after Checkout return
+    if (request.method === "GET" && route === "/studio/booking/session") {
+      const sessionId = url.searchParams.get("session_id") || "";
+      if (!sessionId) {
+        return json({ error: "session_id required" }, 400, origin);
+      }
+      const payload = await readPayload(env);
+      const booking = (payload.bookings || []).find(
+        (b) => b.stripeSessionId === sessionId
+      );
+      if (!booking) {
+        return json({ error: "Booking not found" }, 404, origin);
+      }
       return json(
         {
           booking,
-          confirmation,
-          email: { ok: true },
+          confirmation:
+            booking.status === "scheduled"
+              ? confirmationDetails(env, booking.format)
+              : null,
         },
-        201,
+        200,
         origin
       );
+    }
+
+    // Legacy direct book (no payment) — disabled when Stripe configured
+    if (request.method === "POST" && route === "/studio/booking") {
+      if (env.STRIPE_SECRET_KEY) {
+        return json(
+          {
+            error:
+              "Use /studio/booking/checkout to pay for your $35 trial.",
+          },
+          400,
+          origin
+        );
+      }
+      return json(
+        {
+          error:
+            "Online booking requires Stripe. Configure STRIPE_SECRET_KEY or use Contact.",
+        },
+        503,
+        origin
+      );
+    }
+
+    // Subscription checkout with mid-month proration
+    if (request.method === "POST" && route === "/studio/subscription/checkout") {
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return json({ error: "Invalid JSON" }, 400, origin);
+      }
+      const { name, email, durationMinutes, startDate } = body || {};
+      const mins = Number(durationMinutes);
+      if (!name?.trim() || !email?.trim() || ![30, 45, 60].includes(mins)) {
+        return json(
+          { error: "Name, email, and duration (30/45/60) are required." },
+          400,
+          origin
+        );
+      }
+      if (!env.STRIPE_SECRET_KEY) {
+        return json({ error: "Stripe is not configured." }, 503, origin);
+      }
+
+      let proration;
+      try {
+        proration = computeProration({
+          durationMinutes: mins,
+          startDate: startDate ? new Date(startDate) : new Date(),
+        });
+      } catch (error) {
+        return json({ error: error.message }, 400, origin);
+      }
+
+      const priceEnvKey = `STRIPE_PRICE_${mins}`;
+      const priceId = env[priceEnvKey] || "";
+      const base = siteBase(env);
+
+      try {
+        const session = await createSubscriptionCheckoutSession(env, {
+          email: String(email).trim().toLowerCase(),
+          name: String(name).trim(),
+          durationMinutes: mins,
+          monthlyRateCents: proration.monthlyRateCents,
+          prorateCents: proration.prorateCents,
+          priceId: priceId || undefined,
+          successUrl: `${base}/?sub=success&session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${base}/?sub=canceled`,
+          billingCycleAnchor: proration.billingCycleAnchor,
+          metadata: {
+            remainingLessons: String(proration.remainingLessons),
+            lessonsInFullMonth: String(proration.lessonsInFullMonth),
+          },
+        });
+        return json(
+          {
+            url: session.url,
+            sessionId: session.id,
+            proration,
+          },
+          200,
+          origin
+        );
+      } catch (error) {
+        return json(
+          { error: error.message || "Could not start subscription checkout." },
+          502,
+          origin
+        );
+      }
+    }
+
+    if (request.method === "GET" && route === "/studio/subscription/proration") {
+      const mins = Number(url.searchParams.get("durationMinutes") || 45);
+      try {
+        const proration = computeProration({
+          durationMinutes: mins,
+          startDate: url.searchParams.get("startDate")
+            ? new Date(url.searchParams.get("startDate"))
+            : new Date(),
+        });
+        return json({ proration }, 200, origin);
+      } catch (error) {
+        return json({ error: error.message }, 400, origin);
+      }
     }
 
     if (request.method === "GET" && route === "/studio/booking") {
@@ -447,7 +680,11 @@ export default {
       const bookings = (payload.bookings || [])
         .filter((b) => b.status !== "cancelled")
         .sort((a, b) => a.start.localeCompare(b.start));
-      return json({ bookings }, 200, origin);
+      return json(
+        { bookings, subscriptions: payload.subscriptions || [] },
+        200,
+        origin
+      );
     }
 
     return json({ error: "Not found" }, 404, origin);

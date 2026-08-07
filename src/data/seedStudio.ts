@@ -23,6 +23,7 @@ export const seedStudio: StudioPayload = {
   updatedAt: new Date().toISOString(),
   availability: defaultAvailability,
   bookings: [],
+  subscriptions: [],
   holidays: [
     {
       id: "holiday-thanksgiving-2026",

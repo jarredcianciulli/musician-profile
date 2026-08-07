@@ -423,7 +423,8 @@ const Admin: React.FC = () => {
                     ) : null}
                   </div>
                   <span className="text-xs uppercase tracking-wider text-sky-deep">
-                    {b.status}
+                      {b.status}
+                      {b.status === "pending_payment" ? " (awaiting Stripe)" : ""}
                   </span>
                 </li>
               ))}

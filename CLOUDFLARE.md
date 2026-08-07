@@ -62,11 +62,29 @@ curl -sI http://127.0.0.1:8089/health
 
 ## 4. API workers (separate from the sites)
 
-Contact + studio booking workers currently use `api.jarredcianciulli.com`. For BSS production:
+Contact + studio booking workers.
 
-1. In each worker `wrangler.toml`, set routes / `WEBSITE_DOMAIN` to `batterystringstudio.com`.
-2. Add custom domain `api.batterystringstudio.com` to the Workers.
-3. Put matching URLs in `~/bss/studio/prod/.env`:
+**studio-api** (slots, trial Checkout, subscriptions):
+
+```bash
+cd workers/studio-api
+npx wrangler kv namespace create STUDIO_KV   # paste id into wrangler.toml
+npx wrangler secret put ADMIN_TOKEN
+npx wrangler secret put STUDIO_STREET_ADDRESS
+npx wrangler secret put GOOGLE_CALENDAR_ID
+npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_EMAIL
+npx wrangler secret put GOOGLE_PRIVATE_KEY
+npx wrangler secret put STRIPE_SECRET_KEY
+npx wrangler secret put STRIPE_WEBHOOK_SECRET
+npx wrangler deploy
+```
+
+Routes: `api.batterystringstudio.com/studio*` (+ legacy jarred host).  
+CORS: apex, www, staging, localhost.  
+Stripe webhook: `https://api.batterystringstudio.com/studio/booking/webhook`  
+Flyer QR: `https://batterystringstudio.com/trial`
+
+Site `REACT_APP_*` on Pi `~/bss/studio/prod/.env`:
 
 ```bash
 REACT_APP_CONTACT_ENDPOINT=https://api.batterystringstudio.com/contact
@@ -74,6 +92,7 @@ REACT_APP_STUDIO_API=https://api.batterystringstudio.com
 REACT_APP_WEBSITE_DOMAIN=https://batterystringstudio.com
 REACT_APP_LAB_URL=https://lab.batterystringstudio.com
 REACT_APP_METHOD_URL=https://method.batterystringstudio.com
+REACT_APP_STUDIO_EMAIL=jarred@batterystringstudio.com
 ```
 
 Redeploy the studio site after changing `.env` (`docker compose up -d --build` in `~/bss/studio/prod`).

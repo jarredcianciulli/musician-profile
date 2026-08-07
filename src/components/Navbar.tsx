@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { analytics } from "../utils/analytics";
 import { PUBLIC_BOOKING_COPY } from "../lib/bookingPolicy";
-import BookingModal from "./BookingModal";
 import LogoLockup from "./brand/LogoLockup";
 
 const navLinks = [
@@ -18,9 +18,9 @@ type Props = {
 };
 
 const Navbar: React.FC<Props> = ({ visible = true }) => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50);
@@ -31,7 +31,7 @@ const Navbar: React.FC<Props> = ({ visible = true }) => {
   const openBooking = (source: string) => {
     analytics.bookingModalOpened(source);
     setIsOpen(false);
-    setIsBookingModalOpen(true);
+    navigate("/trial");
   };
 
   const handleSmoothScroll = (
@@ -137,11 +137,6 @@ const Navbar: React.FC<Props> = ({ visible = true }) => {
           </div>
         )}
       </div>
-
-      <BookingModal
-        isOpen={isBookingModalOpen}
-        onClose={() => setIsBookingModalOpen(false)}
-      />
     </nav>
   );
 };

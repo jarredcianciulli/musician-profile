@@ -70,6 +70,21 @@ export type LessonBooking = {
   durationMinutes: number;
   status: LessonBookingStatus;
   createdAt: string;
+  stripeSessionId?: string;
+  stripePaymentIntent?: string;
+  amountCents?: number;
+  paidAt?: string;
+};
+
+export type StudioSubscription = {
+  id: string;
+  stripeSubscriptionId: string;
+  stripeCustomerId: string;
+  email: string;
+  name: string;
+  durationMinutes: number;
+  status: string;
+  createdAt: string;
 };
 
 /** Opaque busy interval (bookings or Google Calendar free/busy) */
@@ -84,6 +99,7 @@ export type StudioPayload = {
   availability: AvailabilityConfig;
   /** Bookings are admin-visible; public slot API never returns PII */
   bookings: LessonBooking[];
+  subscriptions?: StudioSubscription[];
   updatedAt: string;
 };
 
