@@ -76,8 +76,11 @@ npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_EMAIL
 npx wrangler secret put GOOGLE_PRIVATE_KEY
 npx wrangler secret put STRIPE_SECRET_KEY
 npx wrangler secret put STRIPE_WEBHOOK_SECRET
+npx wrangler secret put BREVO_API_KEY   # booking + lead emails (same key as contact worker)
 npx wrangler deploy
 ```
+
+`FROM_EMAIL` / `TO_EMAIL` / `FROM_NAME` are wrangler vars. Confirmations fire on trial paid, subscription paid, and `/lead` (studio + client).
 
 Custom domain: `booking-api.batterystringstudio.com` (Workers Domains).  
 `api.batterystringstudio.com` stays on the tunnel/Caddy stack.  

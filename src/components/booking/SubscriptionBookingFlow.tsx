@@ -25,6 +25,7 @@ import {
 } from "@/content/studioPolicy";
 import { LessonFormat, TimeSlot } from "@/types/studio";
 import { lockBodyScroll, unlockBodyScroll } from "@/lib/scrollLock";
+import Link from "next/link";
 import LogoLockup from "@/components/brand/LogoLockup";
 import { brand } from "@/config/brand";
 import BookingDayPicker from "@/components/booking/BookingDayPicker";
@@ -221,12 +222,22 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
       aria-labelledby="sub-booking-title"
     >
       <header className="flex items-center justify-between gap-3 px-5 py-3 border-b border-line shrink-0">
-        <LogoLockup
-          variant="horizontal"
-          tone="light"
-          className="max-w-[180px]"
-          markClassName="w-5 h-9 text-sky-deep shrink-0"
-        />
+        <Link
+          href="/"
+          onClick={(e) => {
+            e.preventDefault();
+            onClose();
+          }}
+          className="block max-w-[180px]"
+          aria-label="Battery String Studio home"
+        >
+          <LogoLockup
+            variant="horizontal"
+            tone="light"
+            className="max-w-[180px]"
+            markClassName="w-5 h-9 text-sky-deep shrink-0"
+          />
+        </Link>
         <button
           type="button"
           onClick={onClose}

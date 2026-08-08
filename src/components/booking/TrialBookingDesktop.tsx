@@ -2,6 +2,7 @@
 
 import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { useAnimate, useReducedMotion } from "framer-motion";
 import { brand } from "../../config/brand";
 import LogoLockup from "../brand/LogoLockup";
@@ -75,12 +76,22 @@ function TrialBookingDesktopPanel({ onClose }: Props) {
         className="relative flex flex-col w-full max-w-lg max-h-[min(880px,calc(100vh-3rem))] bg-paper border border-line shadow-2xl opacity-0 overflow-hidden"
       >
         <header className="flex items-center justify-between gap-3 px-5 py-3 border-b border-line shrink-0">
-          <LogoLockup
-            variant="horizontal"
-            tone="light"
-            className="max-w-[200px]"
-            markClassName="w-5 h-9 text-sky-deep shrink-0"
-          />
+          <Link
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              onClose();
+            }}
+            className="block max-w-[200px]"
+            aria-label="Battery String Studio home"
+          >
+            <LogoLockup
+              variant="horizontal"
+              tone="light"
+              className="max-w-[200px]"
+              markClassName="w-5 h-9 text-sky-deep shrink-0"
+            />
+          </Link>
           <button
             type="button"
             onClick={onClose}

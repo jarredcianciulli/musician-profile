@@ -20,6 +20,9 @@ id = "628e269674a74751b113c64d7dbd7a33"
 WEBSITE_DOMAIN = "https://batterystringstudio.com"
 # Comma-separated extra CORS origins (staging, www, local)
 CORS_ORIGINS = "https://batterystringstudio.com,https://www.batterystringstudio.com,https://staging.batterystringstudio.com,http://localhost:3000"
+FROM_EMAIL = "jarred@batterystringstudio.com"
+TO_EMAIL = "jarred@batterystringstudio.com"
+FROM_NAME = "Battery String Studio"
 
 [env.dev.vars]
 WEBSITE_DOMAIN = "http://localhost:3000"

@@ -4,6 +4,7 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -39,7 +40,33 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
 
   const closeBooking = useCallback(() => {
     setDesktopOpen(false);
-  }, []);
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const bookingKeys = ["book", "success", "session_id", "canceled", "bid", "local"];
+    let changed = false;
+    for (const key of bookingKeys) {
+      if (params.has(key)) {
+        params.delete(key);
+        changed = true;
+      }
+    }
+    if (changed) {
+      const q = params.toString();
+      router.replace(q ? `/?${q}` : "/", { scroll: false });
+    }
+  }, [router]);
+
+  /** Deep-link /trial redirects here with ?book=1 (plus flyer / Stripe return params). */
+  useEffect(() => {
+    if (!isDesktop || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("book") !== "1") return;
+    setDesktopOpen(true);
+    analytics.bookingModalOpened("Deep link");
+    params.delete("book");
+    const q = params.toString();
+    router.replace(q ? `/?${q}` : "/", { scroll: false });
+  }, [isDesktop, router]);
 
   const value = useMemo(
     () => ({ openBooking, closeBooking, isDesktopOpen }),

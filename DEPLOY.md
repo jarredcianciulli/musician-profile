@@ -58,10 +58,25 @@ Ad / lead URLs: `https://batterystringstudio.com/lead?f={code}&utm_source=…`
 4. Search Console + Bing — submit sitemap after prod deploy
 5. Ongoing: Google reviews
 
-## Studio API after hold/leads changes
+## Studio API (holds, leads, Brevo)
 
 ```bash
-cd workers/studio-api && npx wrangler deploy
+cd workers/studio-api
+npx wrangler secret put BREVO_API_KEY   # same key as brevo-contact-worker
+npx wrangler secret put ADMIN_TOKEN
+npx wrangler deploy
 ```
 
-Stripe webhook must receive `checkout.session.expired` (enable in Stripe Dashboard if not already).
+Vars already in `wrangler.toml`: `FROM_EMAIL` / `TO_EMAIL` / `FROM_NAME`.
+
+**Emails sent on:** trial paid, subscription paid, `/lead` form (studio alert + client auto-reply). Soft-fail if Brevo is unset.
+
+## Launch checklist (ops)
+
+1. Stripe webhook includes `checkout.session.completed` **and** `checkout.session.expired`
+2. Worker secrets: `BREVO_API_KEY`, `ADMIN_TOKEN`, Stripe, Google Calendar, street — `/admin` login works
+3. Brevo sender `jarred@batterystringstudio.com` verified
+4. Pi `.env`: real `NEXT_PUBLIC_FACEBOOK_URL` / `NEXT_PUBLIC_INSTAGRAM_URL` → redeploy
+5. Google Business Profile verified (service-area, booking URL `/trial`) — see CLOUDFLARE.md §7
+6. Search Console → submit `https://batterystringstudio.com/sitemap.xml`
+7. Smoke: trial pay (two emails), subscribe cancel (slot frees + lead), `/lead` (two emails)

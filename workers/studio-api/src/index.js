@@ -14,6 +14,11 @@ import {
   leadFromReservation,
   upsertLead,
 } from "./leads.js";
+import {
+  sendLeadEmails,
+  sendSubscriptionBookedEmails,
+  sendTrialBookedEmails,
+} from "./mailers.js";
 
 const STORE_KEY = "studio_payload_v2";
 const HOLD_TTL_MS = 20 * 60 * 1000;
@@ -394,11 +399,42 @@ function confirmationDetails(env, format) {
   };
 }
 
+async function markTrialEmailsSent(env, payload, bookingId) {
+  const bookings = (payload.bookings || []).map((b) =>
+    b.id === bookingId
+      ? { ...b, emailsSentAt: new Date().toISOString() }
+      : b
+  );
+  const next = { ...payload, bookings, updatedAt: new Date().toISOString() };
+  await writePayload(env, next);
+  return next;
+}
+
+async function markSubEmailsSent(env, payload, subId) {
+  const subscriptions = (payload.subscriptions || []).map((s) =>
+    s.id === subId || s.stripeSubscriptionId === subId
+      ? { ...s, emailsSentAt: new Date().toISOString() }
+      : s
+  );
+  const next = {
+    ...payload,
+    subscriptions,
+    updatedAt: new Date().toISOString(),
+  };
+  await writePayload(env, next);
+  return next;
+}
+
 /** Mark trial booking paid from a completed Checkout session (webhook or return URL). */
 async function confirmTrialFromSession(env, payload, session) {
   const meta = session?.metadata || {};
   const bookingId = meta.bookingId || session.client_reference_id || "";
   if (!bookingId) return { payload, booking: null };
+
+  const prior = (payload.bookings || []).find((b) => b.id === bookingId);
+  if (prior?.status === "scheduled" && prior.emailsSentAt) {
+    return { payload, booking: prior };
+  }
 
   let booking = null;
   const bookings = (payload.bookings || []).map((b) => {
@@ -412,24 +448,36 @@ async function confirmTrialFromSession(env, payload, session) {
           ? session.payment_intent
           : session.payment_intent?.id || b.stripePaymentIntent,
       paidAt: b.paidAt || new Date().toISOString(),
+      emailsSentAt: b.emailsSentAt,
     };
     return booking;
   });
 
   if (!booking) return { payload, booking: null };
 
-  const next = {
+  let next = {
     ...payload,
     bookings,
     updatedAt: new Date().toISOString(),
   };
   await writePayload(env, next);
+
+  if (!booking.emailsSentAt) {
+    try {
+      await sendTrialBookedEmails(env, booking);
+      next = await markTrialEmailsSent(env, next, bookingId);
+      booking = { ...booking, emailsSentAt: new Date().toISOString() };
+    } catch (err) {
+      console.error("Trial confirmation emails failed:", err);
+    }
+  }
+
   return { payload: next, booking };
 }
 
 async function confirmSubscriptionFromSession(env, payload, session) {
   const meta = session?.metadata || {};
-  if (meta.type !== "subscription") return payload;
+  if (meta.type !== "subscription") return { payload, subscription: null };
 
   const subId =
     typeof session.subscription === "string"
@@ -443,9 +491,26 @@ async function confirmSubscriptionFromSession(env, payload, session) {
   const existing = (payload.subscriptions || []).find(
     (s) => s.stripeSubscriptionId && s.stripeSubscriptionId === subId
   );
-  if (existing) return payload;
+  if (existing) {
+    if (!existing.emailsSentAt) {
+      try {
+        const reservation = (payload.reservations || []).find(
+          (r) => r.id === existing.reservationId
+        );
+        await sendSubscriptionBookedEmails(env, existing, reservation);
+        const next = await markSubEmailsSent(env, payload, existing.id);
+        return { payload: next, subscription: existing };
+      } catch (err) {
+        console.error("Subscription confirmation emails failed:", err);
+      }
+    }
+    return { payload, subscription: existing };
+  }
 
   const reservationId = meta.reservationId || "";
+  const reservation = (payload.reservations || []).find(
+    (r) => r.id === reservationId
+  );
   const reservations = (payload.reservations || []).map((r) => {
     if (reservationId && r.id === reservationId) {
       return { ...r, status: "active", stripeSessionId: session.id };
@@ -457,26 +522,34 @@ async function confirmSubscriptionFromSession(env, payload, session) {
     id: newId("sub"),
     stripeSubscriptionId: subId || "",
     stripeCustomerId: customerId || "",
-    email: (session.customer_email || "").toLowerCase(),
-    name: meta.name || "",
-    durationMinutes: Number(meta.durationMinutes || 45),
+    email: (session.customer_email || reservation?.email || "").toLowerCase(),
+    name: meta.name || reservation?.name || "",
+    durationMinutes: Number(meta.durationMinutes || reservation?.durationMinutes || 45),
     status: "active",
     createdAt: new Date().toISOString(),
-    slotStart: meta.slotStart || "",
-    slotEnd: meta.slotEnd || "",
-    weekday: Number(meta.weekday || 0) || undefined,
-    format: meta.format || "in_person",
+    slotStart: meta.slotStart || reservation?.start || "",
+    slotEnd: meta.slotEnd || reservation?.end || "",
+    weekday: Number(meta.weekday || reservation?.weekday || 0) || undefined,
+    format: meta.format || reservation?.format || "in_person",
     policyAcceptedAt: meta.policyAcceptedAt || "",
     reservationId: reservationId || undefined,
   };
-  const next = {
+  let next = {
     ...payload,
     reservations,
     subscriptions: [...(payload.subscriptions || []), record],
     updatedAt: new Date().toISOString(),
   };
   await writePayload(env, next);
-  return next;
+
+  try {
+    await sendSubscriptionBookedEmails(env, record, reservation);
+    next = await markSubEmailsSent(env, next, record.id);
+  } catch (err) {
+    console.error("Subscription confirmation emails failed:", err);
+  }
+
+  return { payload: next, subscription: record };
 }
 
 function siteBase(env) {
@@ -558,7 +631,12 @@ export default {
         }
 
         if (meta.type === "subscription") {
-          await confirmSubscriptionFromSession(env, payload, session);
+          const result = await confirmSubscriptionFromSession(
+            env,
+            payload,
+            session
+          );
+          payload = result.payload;
         }
       }
 
@@ -1234,7 +1312,7 @@ export default {
           : "lead_form";
 
       const payload = await readPayload(env);
-      const leads = upsertLead(payload.leads, {
+      const lead = {
         source: flyer && source === "lead_form" ? "flyer" : source,
         status: "new",
         name,
@@ -1248,12 +1326,24 @@ export default {
           : undefined,
         path: body?.path ? String(body.path).slice(0, 200) : undefined,
         notes: body?.notes ? String(body.notes).slice(0, 500) : undefined,
-      });
+      };
+      const leads = upsertLead(payload.leads, lead);
+      const saved =
+        leads.find(
+          (l) =>
+            (email && l.email === email && l.status === "new") ||
+            (phone && l.phone === phone && l.status === "new")
+        ) || leads[0];
       await writePayload(env, {
         ...payload,
         leads,
         updatedAt: new Date().toISOString(),
       });
+      try {
+        await sendLeadEmails(env, { ...lead, ...(saved || {}) });
+      } catch (err) {
+        console.error("Lead notification emails failed:", err);
+      }
       return json({ ok: true }, 200, origin);
     }
 
