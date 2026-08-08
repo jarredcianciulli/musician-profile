@@ -16,10 +16,13 @@ type Props = {
   onClose: () => void;
 };
 
+/**
+ * Full-viewport desktop trial shell — covers the page (not a floating card).
+ * Mobile uses TrialBookingMobile.
+ */
 function TrialBookingDesktopPanel({ onClose }: Props) {
   const booking = useTrialBooking();
-  const [backdropRef, animateBackdrop] = useAnimate();
-  const [panelRef, animatePanel] = useAnimate();
+  const [shellRef, animateShell] = useAnimate();
   const reduceMotion = useReducedMotion();
 
   useEffect(() => {
@@ -36,59 +39,47 @@ function TrialBookingDesktopPanel({ onClose }: Props) {
   }, [onClose]);
 
   useEffect(() => {
-    const backdrop = backdropRef.current;
-    const panel = panelRef.current;
-    if (!backdrop || !panel) return;
+    const el = shellRef.current;
+    if (!el) return;
     if (reduceMotion) {
-      animateBackdrop(backdrop, { opacity: 1 }, { duration: 0 });
-      animatePanel(panel, { opacity: 1, y: 0, scale: 1 }, { duration: 0 });
+      void animateShell(el, { opacity: 1 }, { duration: 0 });
       return;
     }
-    void animateBackdrop(
-      backdrop,
+    void animateShell(
+      el,
       { opacity: [0, 1] },
       { duration: 0.28, ease: "easeOut" }
     );
-    void animatePanel(
-      panel,
-      { opacity: [0, 1], y: [18, 0], scale: [0.98, 1] },
-      { duration: 0.42, ease: [0.22, 1, 0.36, 1] }
-    );
-  }, [animateBackdrop, animatePanel, reduceMotion, backdropRef, panelRef]);
+  }, [animateShell, reduceMotion, shellRef]);
 
   const nextDisabled =
     (booking.step === 2 && !booking.selectedSlot) ||
     (booking.step === 3 && (!booking.name.trim() || !booking.email.trim()));
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
-      <div
-        ref={backdropRef}
-        className="absolute inset-0 bg-ink/45 opacity-0"
-        onClick={onClose}
-        aria-hidden
-      />
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="trial-desktop-title"
-        className="relative flex flex-col w-full max-w-lg max-h-[min(880px,calc(100vh-3rem))] bg-paper border border-line shadow-2xl opacity-0 overflow-hidden"
-      >
-        <header className="flex items-center justify-between gap-3 px-5 py-3 border-b border-line shrink-0">
+    <div
+      ref={shellRef}
+      className="fixed inset-0 z-[110] bg-paper flex flex-col opacity-0"
+      style={{ height: "100dvh", maxHeight: "100dvh" }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="trial-desktop-title"
+    >
+      <div className="flex flex-col flex-1 min-h-0 w-full max-w-2xl mx-auto">
+        <header className="flex items-center justify-between gap-3 px-6 py-3 border-b border-line shrink-0">
           <Link
             href="/"
             onClick={(e) => {
               e.preventDefault();
               onClose();
             }}
-            className="block max-w-[200px]"
+            className="block max-w-[220px]"
             aria-label="Battery String Studio home"
           >
             <LogoLockup
               variant="horizontal"
               tone="light"
-              className="max-w-[200px]"
+              className="max-w-[220px]"
               markClassName="w-5 h-9 text-sky-deep shrink-0"
             />
           </Link>
@@ -102,7 +93,7 @@ function TrialBookingDesktopPanel({ onClose }: Props) {
           </button>
         </header>
 
-        <div className="px-5 pt-4 pb-2 shrink-0">
+        <div className="px-6 pt-5 pb-2 shrink-0">
           <p className="text-[11px] uppercase tracking-[0.18em] text-sky-deep font-semibold">
             {brand.studioName}
           </p>
@@ -110,7 +101,7 @@ function TrialBookingDesktopPanel({ onClose }: Props) {
             <>
               <h2
                 id="trial-desktop-title"
-                className="font-display text-2xl text-ink mt-1"
+                className="font-display text-3xl text-ink mt-1"
               >
                 {PUBLIC_BOOKING_COPY.modalTitle}
               </h2>
@@ -119,17 +110,14 @@ function TrialBookingDesktopPanel({ onClose }: Props) {
               </p>
             </>
           ) : (
-            <h2
-              id="trial-desktop-title"
-              className="sr-only"
-            >
+            <h2 id="trial-desktop-title" className="sr-only">
               {PUBLIC_BOOKING_COPY.successTitle}
             </h2>
           )}
         </div>
 
         {!booking.success && (
-          <nav className="flex gap-1 px-5 pb-3 shrink-0" aria-label="Progress">
+          <nav className="flex gap-1 px-6 pb-3 shrink-0" aria-label="Progress">
             {TRIAL_STEPS.map((s) => (
               <div key={s.n} className="flex-1">
                 <div
@@ -151,16 +139,16 @@ function TrialBookingDesktopPanel({ onClose }: Props) {
           </nav>
         )}
 
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-4">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 py-4">
           {booking.success ? (
             <TrialBookingSuccess booking={booking} onDone={onClose} />
           ) : (
-            <TrialBookingSteps booking={booking} compact />
+            <TrialBookingSteps booking={booking} />
           )}
         </div>
 
         {!booking.success && !booking.loading && (
-          <footer className="shrink-0 border-t border-line px-5 py-3 flex gap-3">
+          <footer className="shrink-0 border-t border-line px-6 py-4 flex gap-3">
             {booking.step > 1 ? (
               <button
                 type="button"
@@ -211,7 +199,6 @@ type ShellProps = {
   onClose: () => void;
 };
 
-/** Desktop booking modal — centered panel. Mobile uses TrialBookingMobile. */
 const TrialBookingDesktop: React.FC<ShellProps> = ({ isOpen, onClose }) => {
   if (!isOpen || typeof document === "undefined") return null;
   return createPortal(

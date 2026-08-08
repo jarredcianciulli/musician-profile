@@ -60,7 +60,7 @@ export async function sendTrialBookedEmails(env, booking) {
         ? `Home studio address: ${street}`
         : "Home studio in the Bowan Village area — reply if you need the address again.";
 
-  await sendTransactionalEmail(env, {
+  const studio = await sendTransactionalEmail(env, {
     to: inbox,
     toName: "Battery String Studio",
     subject: `New trial booked — ${name}`,
@@ -76,9 +76,17 @@ export async function sendTrialBookedEmails(env, booking) {
     `),
     replyTo: email ? { email, name } : undefined,
   });
+  if (!studio.ok && !studio.skipped) {
+    throw new Error(
+      `Studio trial email failed: ${studio.status || ""} ${studio.details || ""}`
+    );
+  }
+  if (studio.skipped) {
+    throw new Error("BREVO_API_KEY not set — skipped trial emails");
+  }
 
   if (email) {
-    await sendTransactionalEmail(env, {
+    const client = await sendTransactionalEmail(env, {
       to: email,
       toName: name,
       subject: "You're booked — Battery String Studio trial",
@@ -95,6 +103,11 @@ export async function sendTrialBookedEmails(env, booking) {
       `),
       replyTo: { email: inbox, name: "Battery String Studio" },
     });
+    if (!client.ok) {
+      throw new Error(
+        `Client trial email failed: ${client.status || ""} ${client.details || ""}`
+      );
+    }
   }
 }
 
@@ -107,7 +120,7 @@ export async function sendSubscriptionBookedEmails(env, sub, reservation) {
   const email = sub.email || reservation?.email || "";
   const mins = sub.durationMinutes || reservation?.durationMinutes || 45;
 
-  await sendTransactionalEmail(env, {
+  const studio = await sendTransactionalEmail(env, {
     to: inbox,
     toName: "Battery String Studio",
     subject: `New subscription — ${name}`,
@@ -122,9 +135,16 @@ export async function sendSubscriptionBookedEmails(env, sub, reservation) {
     `),
     replyTo: email ? { email, name } : undefined,
   });
+  if (!studio.ok) {
+    throw new Error(
+      studio.skipped
+        ? "BREVO_API_KEY not set — skipped subscription emails"
+        : `Studio subscription email failed: ${studio.status || ""} ${studio.details || ""}`
+    );
+  }
 
   if (email) {
-    await sendTransactionalEmail(env, {
+    const client = await sendTransactionalEmail(env, {
       to: email,
       toName: name,
       subject: "Your weekly lesson is reserved — Battery String Studio",
@@ -139,6 +159,11 @@ export async function sendSubscriptionBookedEmails(env, sub, reservation) {
       `),
       replyTo: { email: inbox, name: "Battery String Studio" },
     });
+    if (!client.ok) {
+      throw new Error(
+        `Client subscription email failed: ${client.status || ""} ${client.details || ""}`
+      );
+    }
   }
 }
 
@@ -149,7 +174,7 @@ export async function sendLeadEmails(env, lead) {
   const email = lead.email || "";
   const phone = lead.phone || "";
 
-  await sendTransactionalEmail(env, {
+  const studio = await sendTransactionalEmail(env, {
     to: inbox,
     toName: "Battery String Studio",
     subject: `New lead — ${name}`,
@@ -166,9 +191,16 @@ export async function sendLeadEmails(env, lead) {
     `),
     replyTo: email ? { email, name } : undefined,
   });
+  if (!studio.ok) {
+    throw new Error(
+      studio.skipped
+        ? "BREVO_API_KEY not set — skipped lead emails"
+        : `Studio lead email failed: ${studio.status || ""} ${studio.details || ""}`
+    );
+  }
 
   if (email) {
-    await sendTransactionalEmail(env, {
+    const client = await sendTransactionalEmail(env, {
       to: email,
       toName: name,
       subject: "Thanks for reaching out — Battery String Studio",
@@ -180,5 +212,10 @@ export async function sendLeadEmails(env, lead) {
       `),
       replyTo: { email: inbox, name: "Battery String Studio" },
     });
+    if (!client.ok) {
+      throw new Error(
+        `Client lead email failed: ${client.status || ""} ${client.details || ""}`
+      );
+    }
   }
 }

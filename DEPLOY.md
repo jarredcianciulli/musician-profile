@@ -98,10 +98,16 @@ npx wrangler deploy --env staging
 
 ### Stripe test webhook
 
+**Use the workers.dev URL** (custom hostname needs DNS; may not resolve yet):
+
 1. Stripe Dashboard → **Test mode** → Developers → Webhooks → Add endpoint  
 2. URL: `https://studio-api-staging.batterystringstudio.workers.dev/studio/booking/webhook`  
 3. Events: `checkout.session.completed`, `checkout.session.expired`  
 4. Copy signing secret → `wrangler secret put STRIPE_WEBHOOK_SECRET --env staging`
+
+If the webhook URL was set to `booking-api-staging.batterystringstudio.com` and that host does not resolve, Stripe never delivers events — update the endpoint to workers.dev above.
+
+Confirm Brevo sender `jarred@batterystringstudio.com` is verified. Failed sends store `emailError` on the booking in `/admin` (and do **not** set `emailsSentAt`, so a later confirm can retry).
 
 Smoke on staging: `/trial` → pay with `4242…` → emails + `/admin` booking. Cancel mid-checkout → hold frees.
 

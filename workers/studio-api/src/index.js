@@ -469,6 +469,19 @@ async function confirmTrialFromSession(env, payload, session) {
       booking = { ...booking, emailsSentAt: new Date().toISOString() };
     } catch (err) {
       console.error("Trial confirmation emails failed:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      const bookingsWithErr = (next.bookings || []).map((b) =>
+        b.id === bookingId
+          ? { ...b, emailError: msg.slice(0, 500) }
+          : b
+      );
+      next = {
+        ...next,
+        bookings: bookingsWithErr,
+        updatedAt: new Date().toISOString(),
+      };
+      await writePayload(env, next);
+      booking = { ...booking, emailError: msg.slice(0, 500) };
     }
   }
 
