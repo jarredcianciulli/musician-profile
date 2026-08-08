@@ -205,18 +205,16 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
 
   if (!isOpen || !mounted) return null;
 
-  const shellClass = mobile
-    ? "fixed inset-0 z-[110] bg-paper flex flex-col"
-    : "fixed inset-0 z-[110] flex items-center justify-center p-6";
+  const shellClass = "fixed inset-0 z-[110] bg-paper flex flex-col";
 
   const panel = (
     <div
       className={
         mobile
           ? "flex flex-col flex-1 min-h-0 w-full max-w-lg mx-auto"
-          : "relative flex flex-col w-full max-w-lg max-h-[min(880px,calc(100vh-3rem))] bg-paper border border-line shadow-2xl overflow-hidden"
+          : "flex flex-col flex-1 min-h-0 w-full max-w-2xl mx-auto"
       }
-      style={mobile ? { height: "100dvh", maxHeight: "100dvh" } : undefined}
+      style={{ height: "100dvh", maxHeight: "100dvh" }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="sub-booking-title"
@@ -527,18 +525,7 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
     </div>
   );
 
-  const overlay = mobile ? (
-    <div className={shellClass}>{panel}</div>
-  ) : (
-    <div className={shellClass}>
-      <div
-        className="absolute inset-0 bg-ink/45"
-        onClick={onClose}
-        aria-hidden
-      />
-      {panel}
-    </div>
-  );
+  const overlay = <div className={shellClass}>{panel}</div>;
 
   return createPortal(overlay, document.body);
 };
