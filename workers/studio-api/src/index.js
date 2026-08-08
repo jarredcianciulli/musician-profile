@@ -904,7 +904,7 @@ export default {
           prorateCents: proration.prorateCents,
           priceId: priceId || undefined,
           successUrl: `${base}/subscribe/success?session_id={CHECKOUT_SESSION_ID}`,
-          cancelUrl: `${base}/subscribe?canceled=1`,
+          cancelUrl: `${base}/?canceled_sub=1#lessons`,
           billingCycleAnchor: proration.billingCycleAnchor,
           metadata: {
             reservationId,

@@ -31,6 +31,13 @@
     @apply antialiased overflow-x-hidden bg-paper text-ink font-sans;
   }
 
+  /* Prevent iOS Safari zoom-on-focus (needs ≥16px). */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
   #root {
     @apply overflow-x-hidden;
   }
@@ -50,7 +57,7 @@
   }
 
   .admin-input {
-    @apply w-full border border-line bg-paper px-3 py-2 text-ink focus:outline-none focus:border-sky-deep;
+    @apply w-full border border-line bg-paper px-3 py-2 text-base text-ink focus:outline-none focus:border-sky-deep;
   }
 }
 

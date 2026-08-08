@@ -5,6 +5,7 @@ import Navbar from "./Navbar";
 import Footer from "./Footer";
 import IntroSplash, { shouldPlayIntro } from "./brand/IntroSplash";
 import { BookingProvider } from "@/context/BookingContext";
+import "@/lib/scrollLock";
 
 export function PublicShell({ children }: { children: React.ReactNode }) {
   const [showIntro, setShowIntro] = useState(false);

@@ -1,11 +1,13 @@
 /**
- * Mid-month proration: first partial month billed per lesson at the regular
- * rate ((monthly × 12) / 46 teaching weeks), then full monthly from the 1st.
+ * Mid-month proration: first partial month billed per lesson at locked flat
+ * rates ($42 / $57 / $81), then full monthly from the 1st.
  *
  * A subscription is ONE weekly lesson — preferredWeekday 1=Mon or 6=Sat.
  */
 
 const RATES = { 30: 160, 45: 220, 60: 310 };
+/** Locked flat rates for mid-month à la carte billing (cents). */
+const PER_LESSON_CENTS = { 30: 4200, 45: 5700, 60: 8100 };
 const TEACHING_WEEKS_PER_YEAR = 46; // ~52 − 6 studio-off weeks
 const TIME_ZONE = "America/New_York";
 
@@ -84,8 +86,12 @@ function countWeekdayOccurrences(from, toExclusive, preferredWeekday) {
   return count;
 }
 
-export function perLessonCents(monthlyRateDollars) {
-  return Math.round((monthlyRateDollars * 12 * 100) / TEACHING_WEEKS_PER_YEAR);
+export function perLessonCents(durationMinutes) {
+  const locked = PER_LESSON_CENTS[durationMinutes];
+  if (locked != null) return locked;
+  const monthly = RATES[durationMinutes];
+  if (!monthly) return 0;
+  return Math.round((monthly * 12 * 100) / TEACHING_WEEKS_PER_YEAR);
 }
 
 export function computeProration({
@@ -110,7 +116,7 @@ export function computeProration({
     nextMonth,
     preferredWeekday
   );
-  const lessonCents = perLessonCents(rate);
+  const lessonCents = PER_LESSON_CENTS[durationMinutes];
   const prorateCents = remainingLessons * lessonCents;
 
   return {
@@ -128,4 +134,4 @@ export function computeProration({
   };
 }
 
-export { RATES, TEACHING_WEEKS_PER_YEAR };
+export { RATES, TEACHING_WEEKS_PER_YEAR, PER_LESSON_CENTS };

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useAnimate, useReducedMotion } from "framer-motion";
+import { createPortal } from "react-dom";
 import {
   dayKey,
   fetchSubscriptionSlots,
@@ -32,14 +32,20 @@ type Step = 1 | 2 | 3 | 4 | 5;
 type Props = {
   isOpen: boolean;
   onClose: () => void;
-  mobile?: boolean;
+  /** Captured when opening — do not flip mid-session. */
+  mobile: boolean;
 };
+
+function money(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+}
 
 const SubscriptionBookingFlow: React.FC<Props> = ({
   isOpen,
   onClose,
   mobile,
 }) => {
+  const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState<Step>(1);
   const [duration, setDuration] = useState<SubscriptionDuration>(
     DEFAULT_SUBSCRIPTION_MINUTES
@@ -55,8 +61,25 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [scope, animate] = useAnimate();
-  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setStep(1);
+    setDuration(DEFAULT_SUBSCRIPTION_MINUTES);
+    setFormat("in_person");
+    setSelectedDay("");
+    setSelectedSlot(null);
+    setName("");
+    setEmail("");
+    setPolicyAccepted(false);
+    setSubmitting(false);
+    setError("");
+    setSlots([]);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -66,34 +89,46 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
 
   useEffect(() => {
     if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
     setLoading(true);
     setError("");
     fetchSubscriptionSlots(duration)
       .then((result) => {
+        if (cancelled) return;
         setSlots(result.slots || []);
-        setTimezone(result.availability?.timezone || "America/New_York");
+        const tz = result.availability?.timezone || "America/New_York";
+        setTimezone(tz);
         const first = result.slots?.[0];
         if (first) {
-          setSelectedDay(dayKey(first.start, result.availability?.timezone || "America/New_York"));
+          setSelectedDay(dayKey(first.start, tz));
         } else {
           setSelectedDay("");
         }
         setSelectedSlot(null);
       })
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : "Could not load times.")
-      )
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (!cancelled) {
+          setError(
+            err instanceof Error ? err.message : "Could not load times."
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, duration]);
-
-  useEffect(() => {
-    if (!isOpen || !scope.current || reduceMotion) return;
-    void animate(
-      scope.current,
-      { opacity: [0, 1], y: [12, 0] },
-      { duration: 0.35, ease: [0.22, 1, 0.36, 1] }
-    );
-  }, [step, isOpen, animate, reduceMotion, scope]);
 
   const days = useMemo(() => {
     const map = new Map<string, string>();
@@ -153,6 +188,7 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
         format,
         policyAccepted: true,
       });
+      unlockBodyScroll();
       window.location.href = result.url;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed.");
@@ -160,7 +196,7 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const shellClass = mobile
     ? "fixed inset-0 z-[100] bg-paper flex flex-col"
@@ -174,6 +210,9 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
           : "relative flex flex-col w-full max-w-lg max-h-[min(880px,calc(100vh-3rem))] bg-paper border border-line shadow-2xl overflow-hidden"
       }
       style={mobile ? { height: "100dvh", maxHeight: "100dvh" } : undefined}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="sub-booking-title"
     >
       <header className="flex items-center justify-between gap-3 px-5 py-3 border-b border-line shrink-0">
         <LogoLockup
@@ -196,7 +235,10 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
         <p className="text-[11px] uppercase tracking-[0.18em] text-sky-deep font-semibold">
           {brand.studioName}
         </p>
-        <h2 className="font-display text-2xl text-ink mt-1">
+        <h2
+          id="sub-booking-title"
+          className="font-display text-2xl text-ink mt-1"
+        >
           Reserve your weekly lesson
         </h2>
         <p className="text-sm text-muted mt-1">
@@ -206,7 +248,7 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-4">
-        <div ref={scope}>
+        <div key={step} className="animate-[bss-rise_0.28s_ease-out]">
           {step === 1 && (
             <div className="space-y-4">
               <p className="text-sm text-ink-soft">
@@ -324,14 +366,19 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
                 <p className="text-ink-soft">
                   Partial first month: {proration.remainingLessons} lesson
                   {proration.remainingLessons === 1 ? "" : "s"} × $
-                  {proration.perLessonDollars.toFixed(2)} ={" "}
-                  <strong>${proration.prorateDollars.toFixed(2)}</strong>
+                  {money(proration.perLessonDollars)} ={" "}
+                  <strong>${money(proration.prorateDollars)}</strong>
                 </p>
                 <p className="text-ink-soft">
                   Then ${monthlyPrice}/mo starting{" "}
                   {new Date(proration.nextCycleStartIso).toLocaleDateString(
                     "en-US",
-                    { month: "long", day: "numeric", year: "numeric", timeZone: timezone }
+                    {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                      timeZone: timezone,
+                    }
                   )}
                   .
                 </p>
@@ -341,9 +388,10 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
                   Name
                 </span>
                 <input
-                  className="mt-1 w-full border border-line px-3 py-3"
+                  className="mt-1 w-full border border-line px-3 py-3 text-base text-ink focus:outline-none focus:border-sky-deep"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  autoComplete="name"
                   required
                 />
               </label>
@@ -353,9 +401,10 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
                 </span>
                 <input
                   type="email"
-                  className="mt-1 w-full border border-line px-3 py-3"
+                  className="mt-1 w-full border border-line px-3 py-3 text-base text-ink focus:outline-none focus:border-sky-deep"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
                   required
                 />
               </label>
@@ -394,13 +443,13 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
             <div className="space-y-3 text-sm">
               <p className="font-medium text-ink text-base">Ready to pay</p>
               <p className="text-ink-soft">
-                Today: ${proration.prorateDollars.toFixed(2)} for remaining
-                lessons this month. Then ${monthlyPrice}/mo.
+                Today: ${money(proration.prorateDollars)} for remaining lessons
+                this month. Then ${monthlyPrice}/mo.
               </p>
               <p className="text-ink-soft">
                 Reserved: {formatSlotDay(selectedSlot.start, timezone)}{" "}
-                {formatSlotTime(selectedSlot.start, timezone)} weekly ·{" "}
-                {name} · {email}
+                {formatSlotTime(selectedSlot.start, timezone)} weekly · {name}{" "}
+                · {email}
               </p>
             </div>
           )}
@@ -423,7 +472,11 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
             Back
           </button>
         ) : (
-          <button type="button" className="btn-secondary flex-1" onClick={onClose}>
+          <button
+            type="button"
+            className="btn-secondary flex-1"
+            onClick={onClose}
+          >
             Cancel
           </button>
         )}
@@ -457,14 +510,20 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
     </div>
   );
 
-  if (mobile) return <div className={shellClass}>{panel}</div>;
-
-  return (
+  const overlay = mobile ? (
+    <div className={shellClass}>{panel}</div>
+  ) : (
     <div className={shellClass}>
-      <div className="absolute inset-0 bg-ink/45" onClick={onClose} aria-hidden />
+      <div
+        className="absolute inset-0 bg-ink/45"
+        onClick={onClose}
+        aria-hidden
+      />
       {panel}
     </div>
   );
+
+  return createPortal(overlay, document.body);
 };
 
 export default SubscriptionBookingFlow;

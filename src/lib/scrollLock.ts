@@ -17,8 +17,6 @@ export function lockBodyScroll() {
     documentElement.style.overflow = "hidden";
     documentElement.style.overscrollBehavior = "none";
     body.style.overscrollBehavior = "none";
-    // Do not use position:fixed + negative top — that offsets the page and
-    // pulls fixed nav (and open mobile menus) off-screen when scrolled.
   }
   lockCount += 1;
 }
@@ -27,7 +25,17 @@ export function unlockBodyScroll() {
   if (typeof document === "undefined") return;
   lockCount = Math.max(0, lockCount - 1);
   if (lockCount > 0) return;
+  clearScrollLockStyles();
+}
 
+/** Force-clear lock (bfcache return from Stripe, etc.). */
+export function forceUnlockBodyScroll() {
+  if (typeof document === "undefined") return;
+  lockCount = 0;
+  clearScrollLockStyles();
+}
+
+function clearScrollLockStyles() {
   const { body, documentElement } = document;
   body.style.overflow = "";
   documentElement.style.overflow = "";
@@ -36,4 +44,15 @@ export function unlockBodyScroll() {
   body.style.paddingRight = savedPaddingRight;
   savedPaddingRight = "";
   delete body.dataset.scrollLocked;
+}
+
+function onPageShow(event: PageTransitionEvent) {
+  // bfcache restore after Stripe cancel can leave overflow:hidden stuck.
+  if (event.persisted) {
+    forceUnlockBodyScroll();
+  }
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("pageshow", onPageShow);
 }

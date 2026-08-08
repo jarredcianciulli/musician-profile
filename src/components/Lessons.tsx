@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { contactInfo } from "../config/contactInfo";
 import {
   DEFAULT_SUBSCRIPTION_MINUTES,
@@ -23,8 +23,28 @@ const Lessons: React.FC = () => {
     DEFAULT_SUBSCRIPTION_MINUTES
   );
   const [subOpen, setSubOpen] = useState(false);
+  /** Freeze layout mode for the open session (avoid SSR→hydrate flip). */
+  const [subMobile, setSubMobile] = useState(false);
 
   const monthlyPrice = SUBSCRIPTION_MONTHLY_RATES[duration];
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("canceled_sub") === "1" || window.location.hash === "#lessons") {
+      document.getElementById("lessons")?.scrollIntoView({ behavior: "smooth" });
+      if (params.get("canceled_sub") === "1") {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("canceled_sub");
+        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash || "#lessons"}`);
+      }
+    }
+  }, []);
+
+  const openSubscribe = () => {
+    setSubMobile(!isDesktop);
+    setSubOpen(true);
+  };
 
   return (
     <section id="lessons" className="py-12 sm:py-16 lg:py-20 bg-gray-50">
@@ -143,7 +163,7 @@ const Lessons: React.FC = () => {
               <button
                 type="button"
                 className="btn-primary w-full mt-auto"
-                onClick={() => setSubOpen(true)}
+                onClick={openSubscribe}
               >
                 Reserve a weekly spot
               </button>
@@ -155,7 +175,7 @@ const Lessons: React.FC = () => {
       <SubscriptionBookingFlow
         isOpen={subOpen}
         onClose={() => setSubOpen(false)}
-        mobile={!isDesktop}
+        mobile={subMobile}
       />
     </section>
   );

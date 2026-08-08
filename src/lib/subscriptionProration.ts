@@ -1,12 +1,20 @@
 /**
  * Mid-month proration — client mirror of workers/studio-api/src/proration.js
- * First partial month = remaining lessons × per-lesson rate ((monthly×12)/46).
+ * First partial month = remaining lessons × locked per-lesson rate, then
+ * monthly from the 1st.
  */
 
 export const SUBSCRIPTION_RATES_DOLLARS: Record<30 | 45 | 60, number> = {
   30: 160,
   45: 220,
   60: 310,
+};
+
+/** Locked flat rates for mid-month à la carte billing (cents). */
+export const PER_LESSON_CENTS: Record<30 | 45 | 60, number> = {
+  30: 4200,
+  45: 5700,
+  60: 8100,
 };
 
 export const TEACHING_WEEKS_PER_YEAR = 46;
@@ -99,10 +107,18 @@ function countWeekdayOccurrences(
   return count;
 }
 
-export function perLessonCents(monthlyRateDollars: number): number {
-  return Math.round(
-    (monthlyRateDollars * 12 * 100) / TEACHING_WEEKS_PER_YEAR
-  );
+/** @deprecated Prefer PER_LESSON_CENTS[duration] — kept for callers that pass monthly. */
+export function perLessonCents(
+  durationOrMonthly: 30 | 45 | 60 | number
+): number {
+  if (durationOrMonthly === 30 || durationOrMonthly === 45 || durationOrMonthly === 60) {
+    return PER_LESSON_CENTS[durationOrMonthly];
+  }
+  // Legacy monthly-dollar path — map known anchors, else derive
+  if (durationOrMonthly === 160) return PER_LESSON_CENTS[30];
+  if (durationOrMonthly === 220) return PER_LESSON_CENTS[45];
+  if (durationOrMonthly === 310) return PER_LESSON_CENTS[60];
+  return Math.round((durationOrMonthly * 12 * 100) / TEACHING_WEEKS_PER_YEAR);
 }
 
 export type ProrationResult = {
@@ -135,7 +151,7 @@ export function computeProration(options: {
     nextMonth,
     preferredWeekday
   );
-  const lessonCents = perLessonCents(rate);
+  const lessonCents = PER_LESSON_CENTS[durationMinutes];
   const prorateCents = remainingLessons * lessonCents;
 
   return {
