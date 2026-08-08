@@ -104,6 +104,32 @@ export type FlyerCampaign = {
   createdAt: string;
 };
 
+export type LeadStatus = "new" | "contacted" | "closed";
+
+export type StudioLead = {
+  id: string;
+  createdAt: string;
+  updatedAt?: string;
+  source: "subscribe_abandon" | "trial_abandon" | "lead_form" | "flyer" | string;
+  status: LeadStatus;
+  name?: string;
+  email?: string;
+  phone?: string;
+  slotStart?: string;
+  slotEnd?: string;
+  durationMinutes?: number;
+  format?: LessonFormat;
+  flyer?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  path?: string;
+  notes?: string;
+  reservationId?: string;
+  bookingId?: string;
+  cancelReason?: string;
+};
+
 /** Opaque busy interval (bookings or Google Calendar free/busy) */
 export type BusyInterval = {
   start: string;
@@ -117,7 +143,9 @@ export type StudioPayload = {
   /** Bookings are admin-visible; public slot API never returns PII */
   bookings: LessonBooking[];
   subscriptions?: StudioSubscription[];
+  reservations?: Array<Record<string, unknown>>;
   flyers?: FlyerCampaign[];
+  leads?: StudioLead[];
   updatedAt: string;
 };
 

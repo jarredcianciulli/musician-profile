@@ -47,3 +47,21 @@ See **CLOUDFLARE.md** in this repo.
 
 QR / print URLs: `https://batterystringstudio.com/f/{code}` (e.g. `/f/bowan-qr-01`).  
 Hits are counted in studio-api KV; view counts in `/admin`.
+
+Ad / lead URLs: `https://batterystringstudio.com/lead?f={code}&utm_source=…`
+
+## Marketing / SEO checklist
+
+1. Free **Google Business Profile** complete + verified (see CLOUDFLARE.md §7)
+2. NAP consistency: same name/phone/area on site, GBP, socials
+3. Set real `NEXT_PUBLIC_FACEBOOK_URL` / `NEXT_PUBLIC_INSTAGRAM_URL` on the Pi `.env` (replace placeholders)
+4. Search Console + Bing — submit sitemap after prod deploy
+5. Ongoing: Google reviews
+
+## Studio API after hold/leads changes
+
+```bash
+cd workers/studio-api && npx wrangler deploy
+```
+
+Stripe webhook must receive `checkout.session.expired` (enable in Stripe Dashboard if not already).

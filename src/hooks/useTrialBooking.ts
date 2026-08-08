@@ -8,7 +8,10 @@ import {
   fetchAvailableSlots,
   fetchBookingBySession,
   formatSlotDay,
+  persistTrialBookingId,
+  releaseTrialHold,
   startTrialCheckout,
+  takeStoredTrialBookingId,
 } from "@/lib/bookingApi";
 import { PUBLIC_TRIAL_MINUTES } from "@/lib/bookingPolicy";
 import { AvailabilityConfig, LessonFormat, TimeSlot } from "@/types/studio";
@@ -106,10 +109,18 @@ export function useTrialBooking(flyerCode?: string) {
   }, [successParam, sessionId, searchParams]);
 
   useEffect(() => {
-    if (canceled) {
-      setError("Checkout was canceled. Pick a time when you're ready.");
-    }
-  }, [canceled]);
+    if (!canceled) return;
+    setError("Checkout was canceled. Pick a time when you're ready.");
+    const bookingId = searchParams.get("bid") || takeStoredTrialBookingId();
+    void (async () => {
+      try {
+        if (bookingId) await releaseTrialHold({ bookingId });
+        analytics.trialCancel();
+      } catch {
+        /* best-effort */
+      }
+    })();
+  }, [canceled, searchParams]);
 
   const days = useMemo(() => {
     const map = new Map<string, string>();
@@ -163,6 +174,10 @@ export function useTrialBooking(flyerCode?: string) {
         format,
         flyer: flyer || undefined,
       });
+      if (result.bookingId) {
+        persistTrialBookingId(result.bookingId);
+      }
+      analytics.trialCheckoutStart();
       window.location.href = result.url;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed.");

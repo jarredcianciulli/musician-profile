@@ -101,3 +101,59 @@ Redeploy the studio site after changing `.env` (`docker compose up -d --build` i
 ## 5. Optional: skip Caddy for one host
 
 You can point a tunnel hostname straight at `http://127.0.0.1:8089` (lab) instead of `:80`. Prefer Caddy Host routes so one tunnel entry stays enough.
+
+## 6. Cloudflare Web Analytics + Zaraz (funnel insights)
+
+PII (name, email, phone, slot) stays in **studio-api KV → `/admin` Leads**. Do **not** send emails/phones into analytics events.
+
+### Web Analytics
+
+1. Cloudflare dashboard → **Web Analytics** → Add site `batterystringstudio.com` (and staging if useful).
+2. Use the **beacon** snippet or enable via the zone (Automatic setup when the hostname is on Cloudflare).
+3. Confirm page views on prod after deploy.
+
+### Zaraz → GA4 (or CF-only)
+
+1. Zone → **Zaraz** → enable.
+2. Add a tool (Google Analytics 4 recommended) with your Measurement ID.
+3. Map custom events fired by the site (`src/utils/analytics.ts` prefers `window.zaraz.track`, falls back to `gtag`):
+
+| Event | When |
+|-------|------|
+| `subscribe_opened` | Weekly subscribe flow opened |
+| `subscribe_step` | Subscribe wizard step |
+| `subscribe_checkout_start` | Redirect to Stripe |
+| `subscribe_cancel` | Returned from Stripe cancel |
+| `subscribe_complete` | `/subscribe/success` |
+| `trial_*` | Same pattern for `/trial` |
+| `lead_form_submit` | `/lead` form success |
+
+4. In Zaraz, create triggers on those event names if you want them in GA4 reports.
+
+## 7. Google Business Profile (free — not Ads / not Workspace)
+
+Voice and “near me” answers come mainly from **GBP + reviews + LocalBusiness schema**, not an Alexa Skill.
+
+Complete the profile (service-area / hide street address to match the site):
+
+| Field | Value |
+|-------|--------|
+| Business name | Battery String Studio |
+| Category | Music school / Violin lessons / Music instructor |
+| Location | **Service-area** (Bowan Village / Charleston) — do not publish full street unless you want walk-ins |
+| Phone | `(610) 340-8827` |
+| Website | `https://batterystringstudio.com` |
+| Booking URL | `https://batterystringstudio.com/trial` |
+| Description | Private violin and viola lessons in the Bowan Village / Charleston area with Jarred Cianciulli. $35 trial lessons; weekly subscriptions. All ages. |
+| Logo | `public/brand/bss-nav-lockup-250.png` (250×250) |
+| Cover | `public/brand/lockup-horizontal.png` or a teaching photo |
+
+Then: finish verification → add photos → ask for Google reviews → Search Console submit `https://batterystringstudio.com/sitemap.xml`.
+
+## 8. Search Console / Bing
+
+After SEO ship:
+
+1. [Google Search Console](https://search.google.com/search-console) → property `batterystringstudio.com` → Sitemaps → `https://batterystringstudio.com/sitemap.xml`
+2. Optional: Bing Webmaster Tools → same sitemap
+3. Staging should send `noindex` when `NEXT_PUBLIC_WEBSITE_DOMAIN` contains `staging`

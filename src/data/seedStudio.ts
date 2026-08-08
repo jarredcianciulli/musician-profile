@@ -25,6 +25,7 @@ export const seedStudio: StudioPayload = {
   availability: defaultAvailability,
   bookings: [],
   subscriptions: [],
+  leads: [],
   flyers: [
     {
       code: "bowan-qr-01",

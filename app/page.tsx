@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PublicShell } from "@/components/PublicShell";
 import HomePage from "@/views/Home";
+import { HomeJsonLd } from "@/components/seo/HomeJsonLd";
 
 export const metadata: Metadata = {
   title: "Violin & Viola Lessons in Charleston",
@@ -16,6 +17,7 @@ export const metadata: Metadata = {
 export default function Page() {
   return (
     <PublicShell>
+      <HomeJsonLd />
       <HomePage />
     </PublicShell>
   );

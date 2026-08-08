@@ -237,6 +237,130 @@ export async function startSubscriptionCheckout(input: {
   return data;
 }
 
+const RESERVATION_STORAGE_KEY = "bss_sub_reservation_id";
+const BOOKING_STORAGE_KEY = "bss_trial_booking_id";
+
+export function persistReservationId(id: string) {
+  try {
+    sessionStorage.setItem(RESERVATION_STORAGE_KEY, id);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function takeStoredReservationId(): string {
+  try {
+    const id = sessionStorage.getItem(RESERVATION_STORAGE_KEY) || "";
+    sessionStorage.removeItem(RESERVATION_STORAGE_KEY);
+    return id;
+  } catch {
+    return "";
+  }
+}
+
+export function persistTrialBookingId(id: string) {
+  try {
+    sessionStorage.setItem(BOOKING_STORAGE_KEY, id);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function takeStoredTrialBookingId(): string {
+  try {
+    const id = sessionStorage.getItem(BOOKING_STORAGE_KEY) || "";
+    sessionStorage.removeItem(BOOKING_STORAGE_KEY);
+    return id;
+  } catch {
+    return "";
+  }
+}
+
+export async function releaseSubscriptionHold(input: {
+  reservationId?: string;
+  sessionId?: string;
+}): Promise<{ ok: boolean; released?: boolean }> {
+  if (!apiBase || (!input.reservationId && !input.sessionId)) {
+    return { ok: true, released: false };
+  }
+  const res = await fetch(`${apiBase}/studio/subscription/release`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not release hold.");
+  }
+  return data;
+}
+
+export async function releaseTrialHold(input: {
+  bookingId?: string;
+  sessionId?: string;
+}): Promise<{ ok: boolean; released?: boolean }> {
+  if (!apiBase || (!input.bookingId && !input.sessionId)) {
+    return { ok: true, released: false };
+  }
+  const res = await fetch(`${apiBase}/studio/booking/release`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not release trial hold.");
+  }
+  return data;
+}
+
+export async function submitLead(input: {
+  name: string;
+  email?: string;
+  phone?: string;
+  source?: string;
+  flyer?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  path?: string;
+  notes?: string;
+  company?: string;
+}): Promise<{ ok: boolean }> {
+  if (!apiBase) {
+    throw new Error("Lead form requires the studio API.");
+  }
+  const res = await fetch(`${apiBase}/studio/leads`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not submit.");
+  }
+  return data;
+}
+
+export async function updateLeadStatus(
+  id: string,
+  status: "new" | "contacted" | "closed",
+  token: string
+): Promise<{ ok: boolean }> {
+  if (!apiBase) throw new Error("Requires studio API.");
+  const res = await fetch(`${apiBase}/studio/leads/status`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ id, status }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Could not update lead.");
+  return data;
+}
+
 export async function fetchSubscriptionSlots(durationMinutes: 30 | 45 | 60) {
   if (!apiBase) {
     const studio = normalizeStudioPayload(await loadStudio());

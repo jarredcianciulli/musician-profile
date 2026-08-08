@@ -23,11 +23,13 @@ import {
   DayHours,
   FlyerCampaign,
   HolidayWeek,
+  LeadStatus,
   StudioEvent,
   StudioPayload,
   Weekday,
 } from "../types/studio";
 import { siteUrl } from "../lib/env";
+import { updateLeadStatus } from "../lib/bookingApi";
 
 const DAY_LABELS: { day: Weekday; label: string }[] = [
   { day: 0, label: "Sunday" },
@@ -103,6 +105,27 @@ const Admin: React.FC = () => {
         ? "Saved to API."
         : "Saved locally (browser). Deploy studio-api + set NEXT_PUBLIC_STUDIO_API for production."
     );
+  };
+
+  const setLeadStatus = async (id: string, status: LeadStatus) => {
+    if (!payload) return;
+    const token = getAdminToken();
+    if (!token) {
+      setStatus("Re-login required to update leads.");
+      return;
+    }
+    try {
+      await updateLeadStatus(id, status, token);
+      setPayload({
+        ...payload,
+        leads: (payload.leads || []).map((l) =>
+          l.id === id ? { ...l, status } : l
+        ),
+      });
+      setStatus(`Lead marked ${status}.`);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Could not update lead.");
+    }
   };
 
   const addFlyer = async (e: React.FormEvent) => {
@@ -416,6 +439,94 @@ const Admin: React.FC = () => {
               Save teaching hours
             </button>
           </form>
+        </section>
+
+        {/* Leads */}
+        <section>
+          <h2 className="font-display text-2xl mb-2">Leads</h2>
+          <p className="text-sm text-muted mb-6">
+            Abandoned checkouts and{" "}
+            <Link href="/lead" className="text-sky-deep hover:underline">
+              /lead
+            </Link>{" "}
+            form submissions. PII stays here — not in analytics.
+          </p>
+          {(payload.leads || []).length === 0 ? (
+            <p className="text-sm text-muted bg-white border border-line px-4 py-6">
+              No leads yet.
+            </p>
+          ) : (
+            <div className="overflow-x-auto border border-line bg-white">
+              <table className="w-full text-sm text-left">
+                <thead className="border-b border-line text-xs uppercase tracking-wider text-muted">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">When</th>
+                    <th className="px-3 py-2 font-medium">Contact</th>
+                    <th className="px-3 py-2 font-medium">Source</th>
+                    <th className="px-3 py-2 font-medium">Slot</th>
+                    <th className="px-3 py-2 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(payload.leads || []).slice(0, 80).map((l) => (
+                    <tr key={l.id} className="border-b border-line/70 align-top">
+                      <td className="px-3 py-2 whitespace-nowrap text-muted">
+                        {new Date(l.createdAt).toLocaleString()}
+                      </td>
+                      <td className="px-3 py-2">
+                        <p className="font-medium">{l.name || "—"}</p>
+                        {l.email ? (
+                          <p className="text-muted">{l.email}</p>
+                        ) : null}
+                        {l.phone ? (
+                          <p className="text-muted">{l.phone}</p>
+                        ) : null}
+                        {l.flyer ? (
+                          <p className="text-xs text-sky-deep">f={l.flyer}</p>
+                        ) : null}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="text-xs uppercase tracking-wider">
+                          {l.source}
+                        </span>
+                        {l.notes ? (
+                          <p className="text-xs text-muted mt-1">{l.notes}</p>
+                        ) : null}
+                        {l.utmSource || l.utmCampaign ? (
+                          <p className="text-xs text-muted mt-1">
+                            {[l.utmSource, l.utmMedium, l.utmCampaign]
+                              .filter(Boolean)
+                              .join(" / ")}
+                          </p>
+                        ) : null}
+                      </td>
+                      <td className="px-3 py-2 text-muted">
+                        {l.slotStart
+                          ? `${formatSlotDay(l.slotStart, tz)} · ${formatSlotTime(l.slotStart, tz)}`
+                          : "—"}
+                        {l.durationMinutes
+                          ? ` (${l.durationMinutes}m)`
+                          : ""}
+                      </td>
+                      <td className="px-3 py-2">
+                        <select
+                          className="admin-input text-xs py-1"
+                          value={l.status}
+                          onChange={(e) =>
+                            setLeadStatus(l.id, e.target.value as LeadStatus)
+                          }
+                        >
+                          <option value="new">new</option>
+                          <option value="contacted">contacted</option>
+                          <option value="closed">closed</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
 
         {/* Bookings */}

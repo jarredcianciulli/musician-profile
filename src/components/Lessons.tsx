@@ -11,6 +11,11 @@ import {
   SUBSCRIPTION_MONTHLY_RATES,
   SubscriptionDuration,
 } from "../lib/bookingPolicy";
+import {
+  releaseSubscriptionHold,
+  takeStoredReservationId,
+} from "../lib/bookingApi";
+import { analytics } from "../utils/analytics";
 import { useBooking } from "../context/BookingContext";
 import { useIsDesktopBooking } from "../hooks/useMediaQuery";
 import SubscriptionBookingFlow from "./booking/SubscriptionBookingFlow";
@@ -31,14 +36,31 @@ const Lessons: React.FC = () => {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("canceled_sub") === "1" || window.location.hash === "#lessons") {
+    const canceled = params.get("canceled_sub") === "1";
+    if (canceled || window.location.hash === "#lessons") {
       document.getElementById("lessons")?.scrollIntoView({ behavior: "smooth" });
-      if (params.get("canceled_sub") === "1") {
-        const url = new URL(window.location.href);
-        url.searchParams.delete("canceled_sub");
-        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash || "#lessons"}`);
-      }
     }
+    if (!canceled) return;
+
+    const reservationId = params.get("rid") || takeStoredReservationId();
+    void (async () => {
+      try {
+        if (reservationId) {
+          await releaseSubscriptionHold({ reservationId });
+        }
+        analytics.subscribeCancel();
+      } catch {
+        /* best-effort release */
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.delete("canceled_sub");
+      url.searchParams.delete("rid");
+      window.history.replaceState(
+        {},
+        "",
+        `${url.pathname}${url.search}${url.hash || "#lessons"}`
+      );
+    })();
   }, []);
 
   const openSubscribe = () => {

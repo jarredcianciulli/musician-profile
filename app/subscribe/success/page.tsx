@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicShell } from "@/components/PublicShell";
+import { SubscribeCompleteBeacon } from "@/components/analytics/SubscribeCompleteBeacon";
 
 export const metadata: Metadata = {
   title: "Subscription confirmed",
@@ -16,6 +17,7 @@ export default async function SubscribeSuccessPage({
 
   return (
     <PublicShell>
+      <SubscribeCompleteBeacon />
       <div className="section-container py-20 max-w-lg">
         <p className="text-[11px] uppercase tracking-[0.18em] text-sky-deep font-semibold">
           Confirmed

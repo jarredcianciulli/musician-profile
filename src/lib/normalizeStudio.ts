@@ -34,6 +34,11 @@ export function normalizeStudioPayload(
     subscriptions: Array.isArray(payload.subscriptions)
       ? payload.subscriptions
       : [],
+    reservations: Array.isArray(payload.reservations)
+      ? payload.reservations
+      : [],
+    flyers: Array.isArray(payload.flyers) ? payload.flyers : seed.flyers || [],
+    leads: Array.isArray(payload.leads) ? payload.leads : [],
     updatedAt: payload.updatedAt || new Date().toISOString(),
   };
 }

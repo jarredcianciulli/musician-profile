@@ -10,8 +10,13 @@ import {
   verifyStripeWebhook,
 } from "./stripe.js";
 import { computeProration } from "./proration.js";
+import {
+  leadFromReservation,
+  upsertLead,
+} from "./leads.js";
 
 const STORE_KEY = "studio_payload_v2";
+const HOLD_TTL_MS = 20 * 60 * 1000;
 
 const PUBLIC_TRIAL_MINUTES = 30;
 const PUBLIC_TRIAL_PRICE_CENTS = 3500;
@@ -58,6 +63,7 @@ const seed = {
   bookings: [],
   subscriptions: [],
   reservations: [],
+  leads: [],
   flyers: seedFlyers,
   holidays: [
     {
@@ -165,6 +171,7 @@ function normalizePayload(raw) {
     bookings: Array.isArray(raw.bookings) ? raw.bookings : [],
     subscriptions: Array.isArray(raw.subscriptions) ? raw.subscriptions : [],
     reservations,
+    leads: Array.isArray(raw.leads) ? raw.leads : [],
     flyers: Array.isArray(raw.flyers) && raw.flyers.length
       ? raw.flyers
       : base.flyers,
@@ -172,12 +179,134 @@ function normalizePayload(raw) {
   };
 }
 
+/** Expire held reservations → abandon leads, then normalize. */
 async function readPayload(env) {
   if (!env.STUDIO_KV) return structuredClone(seed);
   const stored = await env.STUDIO_KV.get(STORE_KEY, "json");
-  if (stored) return normalizePayload(stored);
-  const legacy = await env.STUDIO_KV.get("studio_payload_v1", "json");
-  return normalizePayload(legacy);
+  const legacy = stored
+    ? null
+    : await env.STUDIO_KV.get("studio_payload_v1", "json");
+  const raw = stored || legacy;
+  if (!raw) return structuredClone(seed);
+
+  const now = Date.now();
+  let leads = Array.isArray(raw.leads) ? [...raw.leads] : [];
+  let changed = false;
+  const reservations = (Array.isArray(raw.reservations) ? raw.reservations : []).map(
+    (r) => {
+      if (
+        r &&
+        r.status === "held" &&
+        r.expiresAt &&
+        new Date(r.expiresAt).getTime() < now
+      ) {
+        changed = true;
+        leads = upsertLead(
+          leads,
+          leadFromReservation(r, "subscribe_abandon", "expired")
+        );
+        return { ...r, status: "expired", cancelledAt: new Date().toISOString() };
+      }
+      return r;
+    }
+  );
+
+  if (changed) {
+    const next = {
+      ...raw,
+      reservations,
+      leads,
+      updatedAt: new Date().toISOString(),
+    };
+    await writePayload(env, next);
+    return normalizePayload(next);
+  }
+
+  return normalizePayload(raw);
+}
+
+function cancelHeldReservation(payload, { reservationId, sessionId, reason }) {
+  let cancelled = null;
+  const reservations = (payload.reservations || []).map((r) => {
+    if (cancelled) return r;
+    const matchId = reservationId && r.id === reservationId;
+    const matchSession = sessionId && r.stripeSessionId === sessionId;
+    if ((matchId || matchSession) && r.status === "held") {
+      cancelled = {
+        ...r,
+        status: "cancelled",
+        cancelledAt: new Date().toISOString(),
+        cancelReason: reason || "user_cancel",
+      };
+      return cancelled;
+    }
+    return r;
+  });
+
+  if (!cancelled) {
+    return { payload, cancelled: null };
+  }
+
+  const leads = upsertLead(
+    payload.leads,
+    leadFromReservation(cancelled, "subscribe_abandon", reason || "user_cancel")
+  );
+
+  return {
+    payload: {
+      ...payload,
+      reservations,
+      leads,
+      updatedAt: new Date().toISOString(),
+    },
+    cancelled,
+  };
+}
+
+function cancelPendingTrial(payload, { bookingId, sessionId, reason }) {
+  let cancelled = null;
+  const bookings = (payload.bookings || []).map((b) => {
+    if (cancelled) return b;
+    const matchId = bookingId && b.id === bookingId;
+    const matchSession = sessionId && b.stripeSessionId === sessionId;
+    if ((matchId || matchSession) && b.status === "pending_payment") {
+      cancelled = {
+        ...b,
+        status: "cancelled",
+        cancelledAt: new Date().toISOString(),
+        cancelReason: reason || "user_cancel",
+      };
+      return cancelled;
+    }
+    return b;
+  });
+
+  if (!cancelled) {
+    return { payload, cancelled: null };
+  }
+
+  const leads = upsertLead(payload.leads, {
+    source: "trial_abandon",
+    status: "new",
+    name: cancelled.name || "",
+    email: cancelled.email || "",
+    slotStart: cancelled.start || "",
+    slotEnd: cancelled.end || "",
+    durationMinutes: cancelled.durationMinutes,
+    format: cancelled.format,
+    bookingId: cancelled.id,
+    cancelReason: reason || "user_cancel",
+  });
+
+  return {
+    payload: {
+      ...payload,
+      bookings,
+      leads,
+      updatedAt: new Date().toISOString(),
+    },
+    cancelled,
+  };
 }
 
 async function writePayload(env, payload) {
@@ -433,6 +562,31 @@ export default {
         }
       }
 
+      if (event.type === "checkout.session.expired") {
+        const session = event.data?.object;
+        const meta = session?.metadata || {};
+        let payload = await readPayload(env);
+
+        if (meta.type === "subscription" || meta.reservationId) {
+          const { payload: next } = cancelHeldReservation(payload, {
+            reservationId: meta.reservationId,
+            sessionId: session?.id,
+            reason: "expired",
+          });
+          payload = next;
+          await writePayload(env, payload);
+        }
+
+        if (meta.type === "trial" || meta.bookingId) {
+          const { payload: next, cancelled } = cancelPendingTrial(payload, {
+            bookingId: meta.bookingId || session?.client_reference_id,
+            sessionId: session?.id,
+            reason: "expired",
+          });
+          if (cancelled) await writePayload(env, next);
+        }
+      }
+
       return json({ received: true }, 200, origin);
     }
 
@@ -484,6 +638,7 @@ export default {
         reservations: Array.isArray(body.reservations)
           ? body.reservations
           : current.reservations,
+        leads: Array.isArray(body.leads) ? body.leads : current.leads,
         flyers: Array.isArray(body.flyers) ? body.flyers : current.flyers,
         updatedAt: new Date().toISOString(),
       });
@@ -634,29 +789,37 @@ export default {
           email: emailNorm,
           name: booking.name,
           successUrl: `${base}/trial?success=1&session_id={CHECKOUT_SESSION_ID}`,
-          cancelUrl: `${base}/trial?canceled=1`,
+          cancelUrl: `${base}/trial?canceled=1&bid=${bookingId}`,
           metadata: {
+            type: "trial",
+            bookingId,
             format: String(format),
             ...(flyerCode ? { flyer: flyerCode } : {}),
           },
         });
 
-        if (flyerCode) {
-          const withFlyer = await readPayload(env);
-          const flyers = [...(withFlyer.flyers || [])];
-          const f = flyers.find((x) => x.code === flyerCode);
-          if (f) {
-            f.trials = (f.trials || 0) + 1;
-            await writePayload(env, {
-              ...withFlyer,
-              flyers,
-              updatedAt: new Date().toISOString(),
-            });
-          }
-        }
         const fresh = await readPayload(env);
+        const flyers = [...(fresh.flyers || [])];
+        if (flyerCode) {
+          const f = flyers.find((x) => x.code === flyerCode);
+          if (f) f.trials = (f.trials || 0) + 1;
+        }
         await writePayload(env, {
           ...fresh,
+          flyers,
+          leads: upsertLead(fresh.leads, {
+            source: "trial_abandon",
+            status: "new",
+            name: booking.name,
+            email: emailNorm,
+            slotStart: start,
+            slotEnd: end,
+            durationMinutes: PUBLIC_TRIAL_MINUTES,
+            format: String(format),
+            bookingId,
+            flyer: flyerCode || undefined,
+            notes: "checkout_started",
+          }),
           bookings: fresh.bookings.map((b) =>
             b.id === bookingId ? { ...b, stripeSessionId: session.id } : b
           ),
@@ -867,7 +1030,7 @@ export default {
       }
 
       const reservationId = newId("res");
-      const expiresAt = new Date(Date.now() + 45 * 60 * 1000).toISOString();
+      const expiresAt = new Date(Date.now() + HOLD_TTL_MS).toISOString();
       const policyAcceptedAt = new Date().toISOString();
       const reservation = {
         id: reservationId,
@@ -888,6 +1051,18 @@ export default {
       await writePayload(env, {
         ...payload,
         reservations: [...(payload.reservations || []), reservation],
+        leads: upsertLead(payload.leads, {
+          source: "subscribe_abandon",
+          status: "new",
+          name: reservation.name,
+          email: reservation.email,
+          slotStart: start,
+          slotEnd: end,
+          durationMinutes: mins,
+          format: reservation.format,
+          reservationId,
+          notes: "checkout_started",
+        }),
         updatedAt: new Date().toISOString(),
       });
 
@@ -904,9 +1079,10 @@ export default {
           prorateCents: proration.prorateCents,
           priceId: priceId || undefined,
           successUrl: `${base}/subscribe/success?session_id={CHECKOUT_SESSION_ID}`,
-          cancelUrl: `${base}/?canceled_sub=1#lessons`,
+          cancelUrl: `${base}/?canceled_sub=1&rid=${reservationId}#lessons`,
           billingCycleAnchor: proration.billingCycleAnchor,
           metadata: {
+            type: "subscription",
             reservationId,
             slotStart: start,
             slotEnd: end,
@@ -965,6 +1141,151 @@ export default {
       } catch (error) {
         return json({ error: error.message }, 400, origin);
       }
+    }
+
+    // Release subscription hold (cancel URL / client)
+    if (request.method === "POST" && route === "/studio/subscription/release") {
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return json({ error: "Invalid JSON" }, 400, origin);
+      }
+      const reservationId = String(body?.reservationId || "").trim();
+      const sessionId = String(body?.sessionId || "").trim();
+      if (!reservationId && !sessionId) {
+        return json(
+          { error: "reservationId or sessionId required" },
+          400,
+          origin
+        );
+      }
+      const payload = await readPayload(env);
+      const { payload: next, cancelled } = cancelHeldReservation(payload, {
+        reservationId,
+        sessionId,
+        reason: body?.reason === "expired" ? "expired" : "user_cancel",
+      });
+      if (!cancelled) {
+        return json({ ok: true, released: false }, 200, origin);
+      }
+      await writePayload(env, next);
+      return json({ ok: true, released: true, reservationId: cancelled.id }, 200, origin);
+    }
+
+    // Release pending trial (cancel URL / client)
+    if (request.method === "POST" && route === "/studio/booking/release") {
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return json({ error: "Invalid JSON" }, 400, origin);
+      }
+      const bookingId = String(body?.bookingId || "").trim();
+      const sessionId = String(body?.sessionId || "").trim();
+      if (!bookingId && !sessionId) {
+        return json({ error: "bookingId or sessionId required" }, 400, origin);
+      }
+      const payload = await readPayload(env);
+      const { payload: next, cancelled } = cancelPendingTrial(payload, {
+        bookingId,
+        sessionId,
+        reason: body?.reason === "expired" ? "expired" : "user_cancel",
+      });
+      if (!cancelled) {
+        return json({ ok: true, released: false }, 200, origin);
+      }
+      await writePayload(env, next);
+      return json({ ok: true, released: true, bookingId: cancelled.id }, 200, origin);
+    }
+
+    // Public lead form
+    if (request.method === "POST" && route === "/studio/leads") {
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return json({ error: "Invalid JSON" }, 400, origin);
+      }
+      // Honeypot
+      if (body?.company || body?.website) {
+        return json({ ok: true }, 200, origin);
+      }
+      const name = String(body?.name || "").trim();
+      const email = String(body?.email || "").trim().toLowerCase();
+      const phone = String(body?.phone || "").trim();
+      if (!email && !phone) {
+        return json({ error: "Email or phone is required." }, 400, origin);
+      }
+      if (name.length > 120 || email.length > 200 || phone.length > 40) {
+        return json({ error: "Invalid field length." }, 400, origin);
+      }
+
+      const flyer = body?.flyer
+        ? String(body.flyer)
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9_-]/g, "")
+        : "";
+      const sourceRaw = String(body?.source || "lead_form").trim();
+      const source =
+        sourceRaw === "flyer" || sourceRaw === "lead_form"
+          ? sourceRaw
+          : "lead_form";
+
+      const payload = await readPayload(env);
+      const leads = upsertLead(payload.leads, {
+        source: flyer && source === "lead_form" ? "flyer" : source,
+        status: "new",
+        name,
+        email: email || undefined,
+        phone: phone || undefined,
+        flyer: flyer || undefined,
+        utmSource: body?.utmSource ? String(body.utmSource).slice(0, 80) : undefined,
+        utmMedium: body?.utmMedium ? String(body.utmMedium).slice(0, 80) : undefined,
+        utmCampaign: body?.utmCampaign
+          ? String(body.utmCampaign).slice(0, 80)
+          : undefined,
+        path: body?.path ? String(body.path).slice(0, 200) : undefined,
+        notes: body?.notes ? String(body.notes).slice(0, 500) : undefined,
+      });
+      await writePayload(env, {
+        ...payload,
+        leads,
+        updatedAt: new Date().toISOString(),
+      });
+      return json({ ok: true }, 200, origin);
+    }
+
+    // Admin: update lead status
+    if (request.method === "POST" && route === "/studio/leads/status") {
+      const token = getBearer(request);
+      if (!env.ADMIN_TOKEN || token !== env.ADMIN_TOKEN) {
+        return json({ error: "Unauthorized" }, 401, origin);
+      }
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return json({ error: "Invalid JSON" }, 400, origin);
+      }
+      const id = String(body?.id || "").trim();
+      const status = String(body?.status || "").trim();
+      if (!id || !["new", "contacted", "closed"].includes(status)) {
+        return json({ error: "id and status (new|contacted|closed) required" }, 400, origin);
+      }
+      const payload = await readPayload(env);
+      const leads = (payload.leads || []).map((l) =>
+        l.id === id
+          ? { ...l, status, updatedAt: new Date().toISOString() }
+          : l
+      );
+      await writePayload(env, {
+        ...payload,
+        leads,
+        updatedAt: new Date().toISOString(),
+      });
+      return json({ ok: true }, 200, origin);
     }
 
     // Flyer tracking

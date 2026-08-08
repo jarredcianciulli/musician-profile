@@ -7,8 +7,10 @@ import {
   fetchSubscriptionSlots,
   formatSlotDay,
   formatSlotTime,
+  persistReservationId,
   startSubscriptionCheckout,
 } from "@/lib/bookingApi";
+import { analytics } from "@/utils/analytics";
 import {
   DEFAULT_SUBSCRIPTION_MINUTES,
   PUBLIC_BOOKING_COPY,
@@ -188,6 +190,10 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
         format,
         policyAccepted: true,
       });
+      if (result.reservationId) {
+        persistReservationId(result.reservationId);
+      }
+      analytics.subscribeCheckoutStart(duration);
       unlockBodyScroll();
       window.location.href = result.url;
     } catch (err) {

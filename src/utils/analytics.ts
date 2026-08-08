@@ -1,8 +1,36 @@
-// Google Analytics Event Tracking Helper
+// Funnel analytics — prefer Cloudflare Zaraz, fall back to gtag
 declare global {
   interface Window {
-    gtag?: (...args: any[]) => void;
-    dataLayer?: any[];
+    gtag?: (...args: unknown[]) => void;
+    dataLayer?: unknown[];
+    zaraz?: {
+      track?: (eventName: string, properties?: Record<string, unknown>) => void;
+    };
+  }
+}
+
+function dualTrack(
+  eventName: string,
+  properties: Record<string, unknown> = {}
+) {
+  if (typeof window === "undefined") return;
+
+  try {
+    if (window.zaraz?.track) {
+      window.zaraz.track(eventName, properties);
+      return;
+    }
+  } catch {
+    /* fall through */
+  }
+
+  if (window.gtag) {
+    window.gtag("event", eventName, {
+      event_category: String(properties.category || "Funnel"),
+      event_label: properties.label,
+      value: properties.value,
+      ...properties,
+    });
   }
 }
 
@@ -12,18 +40,14 @@ export const trackEvent = (
   eventLabel?: string,
   value?: number
 ) => {
-  if (typeof window !== "undefined" && window.gtag) {
-    window.gtag("event", eventName, {
-      event_category: eventCategory,
-      event_label: eventLabel,
-      value: value,
-    });
-  }
+  dualTrack(eventName, {
+    category: eventCategory,
+    label: eventLabel,
+    value,
+  });
 };
 
-// Predefined events for easy tracking
 export const analytics = {
-  // Booking events
   bookingModalOpened: (location: string) => {
     trackEvent("booking_modal_opened", "Booking", location);
   },
@@ -31,7 +55,6 @@ export const analytics = {
     trackEvent("booking_completed", "Booking", "Studio booking");
   },
 
-  // Contact events
   contactFormSubmitted: () => {
     trackEvent("contact_form_submit", "Contact", "Main Contact Form");
   },
@@ -39,7 +62,6 @@ export const analytics = {
     trackEvent("express_interest_clicked", "Contact", "Group Classes Interest");
   },
 
-  // Navigation events
   learnMoreClicked: (location: string) => {
     trackEvent("learn_more_clicked", "Navigation", location);
   },
@@ -47,12 +69,34 @@ export const analytics = {
     trackEvent("nav_link_clicked", "Navigation", section);
   },
 
-  // Social media clicks
   socialMediaClicked: (platform: string) => {
     trackEvent("social_media_clicked", "Engagement", platform);
   },
+
+  subscribeOpened: () => dualTrack("subscribe_opened", { category: "Subscribe" }),
+  subscribeStep: (step: number | string) =>
+    dualTrack("subscribe_step", { category: "Subscribe", step }),
+  subscribeCheckoutStart: (duration?: number) =>
+    dualTrack("subscribe_checkout_start", {
+      category: "Subscribe",
+      duration,
+    }),
+  subscribeCancel: () =>
+    dualTrack("subscribe_cancel", { category: "Subscribe" }),
+  subscribeComplete: () =>
+    dualTrack("subscribe_complete", { category: "Subscribe" }),
+
+  trialOpened: () => dualTrack("trial_opened", { category: "Trial" }),
+  trialStep: (step: number | string) =>
+    dualTrack("trial_step", { category: "Trial", step }),
+  trialCheckoutStart: () =>
+    dualTrack("trial_checkout_start", { category: "Trial" }),
+  trialCancel: () => dualTrack("trial_cancel", { category: "Trial" }),
+  trialComplete: () => dualTrack("trial_complete", { category: "Trial" }),
+
+  leadFormSubmit: (flyer?: string) =>
+    dualTrack("lead_form_submit", {
+      category: "Lead",
+      flyer: flyer || undefined,
+    }),
 };
-
-
-
-
