@@ -6,13 +6,13 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        REACT_APP_CONTACT_ENDPOINT: ${REACT_APP_CONTACT_ENDPOINT:-https://api.jarredcianciulli.com/contact}
-        REACT_APP_STUDIO_API: ${REACT_APP_STUDIO_API:-https://booking-api.batterystringstudio.com}
-        REACT_APP_WEBSITE_DOMAIN: ${REACT_APP_WEBSITE_DOMAIN:-https://batterystringstudio.com}
-        REACT_APP_LAB_URL: ${REACT_APP_LAB_URL:-https://lab.batterystringstudio.com}
-        REACT_APP_METHOD_URL: ${REACT_APP_METHOD_URL:-https://method.batterystringstudio.com}
-        REACT_APP_STUDIO_EMAIL: ${REACT_APP_STUDIO_EMAIL:-jarred@batterystringstudio.com}
+        NEXT_PUBLIC_CONTACT_ENDPOINT: ${NEXT_PUBLIC_CONTACT_ENDPOINT:-https://api.jarredcianciulli.com/contact}
+        NEXT_PUBLIC_STUDIO_API: ${NEXT_PUBLIC_STUDIO_API:-https://booking-api.batterystringstudio.com}
+        NEXT_PUBLIC_WEBSITE_DOMAIN: ${NEXT_PUBLIC_WEBSITE_DOMAIN:-https://batterystringstudio.com}
+        NEXT_PUBLIC_LAB_URL: ${NEXT_PUBLIC_LAB_URL:-https://lab.batterystringstudio.com}
+        NEXT_PUBLIC_METHOD_URL: ${NEXT_PUBLIC_METHOD_URL:-https://method.batterystringstudio.com}
+        NEXT_PUBLIC_STUDIO_EMAIL: ${NEXT_PUBLIC_STUDIO_EMAIL:-jarred@batterystringstudio.com}
     container_name: bss_studio_prod
     ports:
-      - "8087:80"
+      - "8087:3000"
     restart: unless-stopped

@@ -1,12 +1,10 @@
 /**
  * Battery String Studio — sky brand lock.
- * Poster people see → same colors/voice on the site.
- * URLs come from CRA env (REACT_APP_*) so staging/prod can differ.
  */
 
-const websiteUrl = (
-  process.env.REACT_APP_WEBSITE_DOMAIN || "https://batterystringstudio.com"
-).replace(/\/$/, "");
+import { labUrl, methodUrl, siteUrl } from "@/lib/env";
+
+const websiteUrl = siteUrl();
 
 export const brand = {
   studioName: "Battery String Studio",
@@ -15,9 +13,8 @@ export const brand = {
   shortTagline: "Private instruction in Charleston, SC",
   website: websiteUrl.replace(/^https?:\/\//, ""),
   websiteUrl,
-  labUrl: process.env.REACT_APP_LAB_URL || "https://lab.batterystringstudio.com",
-  methodUrl:
-    process.env.REACT_APP_METHOD_URL || "https://method.batterystringstudio.com",
+  labUrl: labUrl(),
+  methodUrl: methodUrl(),
 };
 
 /** Sky lock — black + #9DB7D4 */
@@ -28,7 +25,7 @@ export const palette = {
   paperMuted: "#E8EEF4",
   sky: "#9DB7D4",
   skyDeep: "#7A9BBF",
-  gold: "#9DB7D4", // alias for existing lockup props
+  gold: "#9DB7D4",
   goldDeep: "#7A9BBF",
   accent: "#0A0A0A",
   accentHover: "#1A1A1C",

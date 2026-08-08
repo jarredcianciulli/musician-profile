@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import { contactInfo } from "../config/contactInfo";
 import { brand } from "../config/brand";
@@ -99,6 +101,10 @@ const Footer: React.FC = () => {
           <p>
             &copy; {new Date().getFullYear()} {brand.studioName} ·{" "}
             {brand.instructorName}
+            {" · "}
+            <a href="/policy" className="hover:text-gold transition-colors">
+              Studio policy
+            </a>
           </p>
         </div>
       </div>

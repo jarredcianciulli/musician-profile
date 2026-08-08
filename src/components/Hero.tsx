@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import { contactInfo } from "../config/contactInfo";
 import { brand } from "../config/brand";
@@ -69,7 +71,7 @@ const Hero: React.FC = () => {
             <div className="hidden lg:flex items-start justify-center pt-6">
               <div className="w-full max-w-sm aspect-[3/4] overflow-hidden shadow-2xl border border-line">
                 <img
-                  src={heroImage}
+                  src={heroImage.src}
                   alt={`${brand.instructorName} — violin & viola instruction`}
                   className="w-full h-full object-cover"
                 />
@@ -81,7 +83,7 @@ const Hero: React.FC = () => {
         <div className="lg:hidden section-container -mt-4 px-4 pb-8">
           <div className="w-full overflow-hidden shadow-lg border border-line">
             <img
-              src={heroImage}
+              src={heroImage.src}
               alt={`${brand.instructorName} — violin & viola instruction`}
               className="w-full h-auto object-cover"
             />

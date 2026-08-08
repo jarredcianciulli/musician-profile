@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";

@@ -194,10 +194,15 @@ export function generateAvailableSlots(options: {
 
     while (slotStart + slotMs <= windowEnd) {
       const slotEnd = slotStart + slotMs;
+      const minLeadHours =
+        typeof availability.minLeadHours === "number"
+          ? availability.minLeadHours
+          : 24;
+      const earliest = now + minLeadHours * 60 * 60 * 1000;
       if (
         slotStart >= fromMs &&
         slotEnd <= toMs &&
-        slotStart >= now + 60 * 60 * 1000 &&
+        slotStart >= earliest &&
         !overlapsBusy(slotStart, slotEnd, busy)
       ) {
         slots.push({

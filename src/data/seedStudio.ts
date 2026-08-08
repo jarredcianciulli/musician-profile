@@ -7,6 +7,7 @@ export const defaultAvailability: AvailabilityConfig = {
   slotIntervalMinutes: 15,
   durationsMinutes: [30, 45, 60],
   defaultDurationMinutes: 30,
+  minLeadHours: 24,
   weeklyHours: [
     { day: 0, start: "10:00", end: "14:00", enabled: false }, // Sun
     { day: 1, start: "18:00", end: "20:00", enabled: true }, // Mon 6–8pm ET
@@ -24,6 +25,22 @@ export const seedStudio: StudioPayload = {
   availability: defaultAvailability,
   bookings: [],
   subscriptions: [],
+  flyers: [
+    {
+      code: "bowan-qr-01",
+      label: "Bowan Village flyer QR",
+      views: 0,
+      trials: 0,
+      createdAt: new Date().toISOString(),
+    },
+    {
+      code: "general",
+      label: "General / untracked",
+      views: 0,
+      trials: 0,
+      createdAt: new Date().toISOString(),
+    },
+  ],
   holidays: [
     {
       id: "holiday-thanksgiving-2026",

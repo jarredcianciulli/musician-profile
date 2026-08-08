@@ -1,8 +1,12 @@
+"use client";
+
 import React, { useState } from "react";
 import { contactInfo } from "../config/contactInfo";
 import { analytics } from "../utils/analytics";
 
-const CONTACT_ENDPOINT = process.env.REACT_APP_CONTACT_ENDPOINT || "";
+import { contactEndpoint } from "@/lib/env";
+
+const CONTACT_ENDPOINT = contactEndpoint();
 
 const Contact: React.FC = () => {
   const [formData, setFormData] = useState({

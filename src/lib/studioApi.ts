@@ -10,7 +10,9 @@ import { normalizeStudioPayload } from "./normalizeStudio";
 const LOCAL_KEY = "bss_studio_payload_v3";
 const TOKEN_KEY = "bss_admin_token";
 
-const apiBase = (process.env.REACT_APP_STUDIO_API || "").replace(/\/$/, "");
+import { studioApiBase } from "./env";
+
+const apiBase = studioApiBase();
 
 function cloneSeed(): StudioPayload {
   return structuredClone(seedStudio);
@@ -18,6 +20,7 @@ function cloneSeed(): StudioPayload {
 
 function readLocal(): StudioPayload {
   try {
+    if (typeof window === "undefined") return cloneSeed();
     const raw =
       localStorage.getItem(LOCAL_KEY) ||
       localStorage.getItem("bss_studio_payload_v1");
@@ -29,6 +32,7 @@ function readLocal(): StudioPayload {
 }
 
 function writeLocal(payload: StudioPayload) {
+  if (typeof window === "undefined") return;
   localStorage.setItem(
     LOCAL_KEY,
     JSON.stringify({ ...payload, updatedAt: new Date().toISOString() })
@@ -36,14 +40,17 @@ function writeLocal(payload: StudioPayload) {
 }
 
 export function getAdminToken(): string {
+  if (typeof window === "undefined") return "";
   return sessionStorage.getItem(TOKEN_KEY) || "";
 }
 
 export function setAdminToken(token: string) {
+  if (typeof window === "undefined") return;
   sessionStorage.setItem(TOKEN_KEY, token);
 }
 
 export function clearAdminToken() {
+  if (typeof window === "undefined") return;
   sessionStorage.removeItem(TOKEN_KEY);
 }
 

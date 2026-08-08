@@ -1,5 +1,7 @@
+"use client";
+
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import BowStringMark from "../components/brand/BowStringMark";
 import { brand } from "../config/brand";
 import {
@@ -19,11 +21,13 @@ import {
 import { formatSlotDay, formatSlotTime } from "../lib/slots";
 import {
   DayHours,
+  FlyerCampaign,
   HolidayWeek,
   StudioEvent,
   StudioPayload,
   Weekday,
 } from "../types/studio";
+import { siteUrl } from "../lib/env";
 
 const DAY_LABELS: { day: Weekday; label: string }[] = [
   { day: 0, label: "Sunday" },
@@ -65,6 +69,8 @@ const Admin: React.FC = () => {
   const [eventForm, setEventForm] = useState<StudioEvent>(emptyEvent());
   const [editingHolidayId, setEditingHolidayId] = useState<string | null>(null);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [flyerCode, setFlyerCode] = useState("");
+  const [flyerLabel, setFlyerLabel] = useState("");
 
   useEffect(() => {
     if (!authed) return;
@@ -95,8 +101,36 @@ const Admin: React.FC = () => {
     setStatus(
       isUsingRemoteApi()
         ? "Saved to API."
-        : "Saved locally (browser). Deploy studio-api + set REACT_APP_STUDIO_API for production."
+        : "Saved locally (browser). Deploy studio-api + set NEXT_PUBLIC_STUDIO_API for production."
     );
+  };
+
+  const addFlyer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payload) return;
+    const code = flyerCode
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "");
+    if (!code) {
+      setStatus("Flyer needs a code (letters, numbers, - or _).");
+      return;
+    }
+    const existing = payload.flyers || [];
+    if (existing.some((f) => f.code === code)) {
+      setStatus(`Flyer “${code}” already exists.`);
+      return;
+    }
+    const flyer: FlyerCampaign = {
+      code,
+      label: flyerLabel.trim() || code,
+      views: 0,
+      trials: 0,
+      createdAt: new Date().toISOString(),
+    };
+    await persist({ ...payload, flyers: [...existing, flyer] });
+    setFlyerCode("");
+    setFlyerLabel("");
   };
 
   const saveHoliday = async (e: React.FormEvent) => {
@@ -188,7 +222,7 @@ const Admin: React.FC = () => {
             Enter
           </button>
           <Link
-            to="/"
+            href="/"
             className="block text-center text-sm text-paper/50 mt-6 hover:text-gold"
           >
             ← Back to site
@@ -227,7 +261,7 @@ const Admin: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-3 text-sm">
-            <Link to="/" className="text-muted hover:text-ink">
+            <Link href="/" className="text-muted hover:text-ink">
               View site
             </Link>
             <button
@@ -670,6 +704,86 @@ const Admin: React.FC = () => {
               </div>
             </form>
           </div>
+        </section>
+
+        {/* Flyer campaigns */}
+        <section>
+          <h2 className="font-display text-2xl mb-2">Flyer URLs</h2>
+          <p className="text-sm text-muted mb-6">
+            Share <code className="text-xs">/f/&#123;code&#125;</code> on print
+            materials. Hits redirect to the trial page with attribution.
+          </p>
+          <div className="bg-white border border-line overflow-x-auto mb-6">
+            <table className="w-full text-sm text-left">
+              <thead className="border-b border-line text-xs uppercase tracking-wider text-muted">
+                <tr>
+                  <th className="px-4 py-3">Code</th>
+                  <th className="px-4 py-3">Label</th>
+                  <th className="px-4 py-3">Views</th>
+                  <th className="px-4 py-3">Trials</th>
+                  <th className="px-4 py-3">QR URL</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(payload.flyers || []).length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-6 text-muted">
+                      No flyers yet — add one below (or hit a{" "}
+                      <code>/f/…</code> URL once).
+                    </td>
+                  </tr>
+                )}
+                {(payload.flyers || []).map((f) => (
+                  <tr key={f.code} className="border-b border-line last:border-0">
+                    <td className="px-4 py-3 font-mono text-xs">{f.code}</td>
+                    <td className="px-4 py-3">{f.label}</td>
+                    <td className="px-4 py-3">{f.views ?? 0}</td>
+                    <td className="px-4 py-3">{f.trials ?? 0}</td>
+                    <td className="px-4 py-3">
+                      <a
+                        className="text-sky-deep underline break-all"
+                        href={`${siteUrl()}/f/${f.code}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {siteUrl()}/f/{f.code}
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <form
+            onSubmit={addFlyer}
+            className="bg-white border border-line p-5 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end"
+          >
+            <label className="text-sm">
+              <span className="text-muted text-xs uppercase tracking-wider">
+                Code
+              </span>
+              <input
+                className="admin-input mt-1"
+                placeholder="bowan-qr-01"
+                value={flyerCode}
+                onChange={(e) => setFlyerCode(e.target.value)}
+              />
+            </label>
+            <label className="text-sm">
+              <span className="text-muted text-xs uppercase tracking-wider">
+                Label
+              </span>
+              <input
+                className="admin-input mt-1"
+                placeholder="Bowan Village flyer"
+                value={flyerLabel}
+                onChange={(e) => setFlyerLabel(e.target.value)}
+              />
+            </label>
+            <button type="submit" className="btn-primary">
+              Add flyer
+            </button>
+          </form>
         </section>
 
         <p className="text-xs text-muted pb-8">

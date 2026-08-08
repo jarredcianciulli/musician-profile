@@ -20,10 +20,11 @@ import {
 } from "./slots";
 import { contactInfo } from "../config/contactInfo";
 import { ProrationResult } from "./subscriptionProration";
+import { studioApiBase } from "./env";
 
 export { dayKey, formatSlotDay, formatSlotTime };
 
-const apiBase = (process.env.REACT_APP_STUDIO_API || "").replace(/\/$/, "");
+const apiBase = studioApiBase();
 
 export type BookingConfirmation = {
   format: LessonFormat;
@@ -88,6 +89,7 @@ export type CheckoutTrialInput = {
   email: string;
   notes?: string;
   format: LessonFormat;
+  flyer?: string;
 };
 
 export type CheckoutTrialResult = {
@@ -214,8 +216,12 @@ export async function startSubscriptionCheckout(input: {
   name: string;
   email: string;
   durationMinutes: 30 | 45 | 60;
-  startDate?: string;
-}): Promise<{ url: string; proration: ProrationResult }> {
+  start: string;
+  end: string;
+  format?: LessonFormat;
+  policyAccepted: boolean;
+  notes?: string;
+}): Promise<{ url: string; proration: ProrationResult; reservationId?: string }> {
   if (!apiBase) {
     throw new Error("Subscription checkout requires the studio API.");
   }
@@ -229,6 +235,40 @@ export async function startSubscriptionCheckout(input: {
     throw new Error(data.error || "Could not start subscription checkout.");
   }
   return data;
+}
+
+export async function fetchSubscriptionSlots(durationMinutes: 30 | 45 | 60) {
+  if (!apiBase) {
+    const studio = normalizeStudioPayload(await loadStudio());
+    const { from, to } = rangeForDays(21);
+    const slots = generateAvailableSlots({
+      from,
+      to,
+      durationMinutes,
+      availability: studio.availability,
+      holidays: studio.holidays,
+      bookings: studio.bookings,
+    });
+    return { slots, availability: studio.availability };
+  }
+  const res = await fetch(
+    `${apiBase}/studio/subscription/slots?durationMinutes=${durationMinutes}`
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Could not load subscription times.");
+  return data as { slots: TimeSlot[]; availability: AvailabilityConfig };
+}
+
+export async function trackFlyerHit(code: string) {
+  if (!apiBase) return { flyer: { code, label: code } };
+  const res = await fetch(`${apiBase}/studio/flyers/hit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Unknown flyer code.");
+  return data as { flyer: { code: string; label: string } };
 }
 
 /** @deprecated use startTrialCheckout */

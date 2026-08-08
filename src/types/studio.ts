@@ -44,13 +44,16 @@ export type AvailabilityConfig = {
   durationsMinutes: number[];
   /** Default duration preselected in the booking form */
   defaultDurationMinutes: number;
+  /** Hide slots that start sooner than this many hours from now */
+  minLeadHours?: number;
   weeklyHours: DayHours[];
 };
 
 export type LessonBookingStatus =
   | "scheduled"
   | "cancelled"
-  | "pending_payment";
+  | "pending_payment"
+  | "reserved";
 
 /** trial = $35 intro; lesson = ongoing monthly (set up after trial) */
 export type LessonType = "trial" | "lesson";
@@ -85,6 +88,20 @@ export type StudioSubscription = {
   durationMinutes: number;
   status: string;
   createdAt: string;
+  slotStart?: string;
+  slotEnd?: string;
+  weekday?: number;
+  format?: LessonFormat;
+  policyAcceptedAt?: string;
+};
+
+export type FlyerCampaign = {
+  code: string;
+  label: string;
+  views: number;
+  trials: number;
+  lastSeenAt?: string;
+  createdAt: string;
 };
 
 /** Opaque busy interval (bookings or Google Calendar free/busy) */
@@ -100,6 +117,7 @@ export type StudioPayload = {
   /** Bookings are admin-visible; public slot API never returns PII */
   bookings: LessonBooking[];
   subscriptions?: StudioSubscription[];
+  flyers?: FlyerCampaign[];
   updatedAt: string;
 };
 

@@ -23,6 +23,7 @@ const defaultAvailability = {
   slotIntervalMinutes: 15,
   durationsMinutes: [30, 45, 60],
   defaultDurationMinutes: 30,
+  minLeadHours: 24,
   weeklyHours: [
     { day: 0, start: "10:00", end: "14:00", enabled: false },
     { day: 1, start: "18:00", end: "20:00", enabled: true },
@@ -34,11 +35,30 @@ const defaultAvailability = {
   ],
 };
 
+const seedFlyers = [
+  {
+    code: "bowan-qr-01",
+    label: "Bowan Village flyer QR",
+    views: 0,
+    trials: 0,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    code: "general",
+    label: "General / untracked",
+    views: 0,
+    trials: 0,
+    createdAt: new Date().toISOString(),
+  },
+];
+
 const seed = {
   updatedAt: new Date().toISOString(),
   availability: defaultAvailability,
   bookings: [],
   subscriptions: [],
+  reservations: [],
+  flyers: seedFlyers,
   holidays: [
     {
       id: "holiday-thanksgiving-2026",
@@ -118,12 +138,25 @@ function getBearer(request) {
 function normalizePayload(raw) {
   const base = structuredClone(seed);
   if (!raw) return base;
+  const now = Date.now();
+  const reservations = (Array.isArray(raw.reservations) ? raw.reservations : [])
+    .filter((r) => {
+      if (!r || r.status === "expired" || r.status === "cancelled") return false;
+      if (r.status === "held" && r.expiresAt && new Date(r.expiresAt).getTime() < now) {
+        return false;
+      }
+      return true;
+    });
   return {
     holidays: Array.isArray(raw.holidays) ? raw.holidays : base.holidays,
     events: Array.isArray(raw.events) ? raw.events : base.events,
     availability: {
       ...base.availability,
       ...(raw.availability || {}),
+      minLeadHours:
+        typeof raw.availability?.minLeadHours === "number"
+          ? raw.availability.minLeadHours
+          : base.availability.minLeadHours,
       weeklyHours:
         raw.availability?.weeklyHours?.length
           ? raw.availability.weeklyHours
@@ -131,6 +164,10 @@ function normalizePayload(raw) {
     },
     bookings: Array.isArray(raw.bookings) ? raw.bookings : [],
     subscriptions: Array.isArray(raw.subscriptions) ? raw.subscriptions : [],
+    reservations,
+    flyers: Array.isArray(raw.flyers) && raw.flyers.length
+      ? raw.flyers
+      : base.flyers,
     updatedAt: raw.updatedAt || new Date().toISOString(),
   };
 }
@@ -175,10 +212,39 @@ function publicStudio(payload) {
       slotIntervalMinutes: payload.availability.slotIntervalMinutes,
       durationsMinutes: payload.availability.durationsMinutes,
       defaultDurationMinutes: payload.availability.defaultDurationMinutes,
+      minLeadHours: payload.availability.minLeadHours ?? 24,
       weeklyHours: payload.availability.weeklyHours,
     },
     updatedAt: payload.updatedAt,
   };
+}
+
+/** Bookings + active subscription holds that block calendar slots */
+function busyBookings(payload) {
+  const now = Date.now();
+  const fromBookings = (payload.bookings || []).filter(
+    (b) => b.status !== "cancelled"
+  );
+  const fromReservations = (payload.reservations || [])
+    .filter((r) => {
+      if (r.status === "active") return true;
+      if (r.status === "held" && r.expiresAt) {
+        return new Date(r.expiresAt).getTime() > now;
+      }
+      return false;
+    })
+    .map((r) => ({
+      id: r.id,
+      start: r.start,
+      end: r.end,
+      status: "reserved",
+      name: r.name || "",
+      email: r.email || "",
+      lessonType: "lesson",
+      durationMinutes: r.durationMinutes,
+      createdAt: r.createdAt,
+    }));
+  return [...fromBookings, ...fromReservations];
 }
 
 function confirmationDetails(env, format) {
@@ -250,6 +316,14 @@ async function confirmSubscriptionFromSession(env, payload, session) {
   );
   if (existing) return payload;
 
+  const reservationId = meta.reservationId || "";
+  const reservations = (payload.reservations || []).map((r) => {
+    if (reservationId && r.id === reservationId) {
+      return { ...r, status: "active", stripeSessionId: session.id };
+    }
+    return r;
+  });
+
   const record = {
     id: newId("sub"),
     stripeSubscriptionId: subId || "",
@@ -259,9 +333,16 @@ async function confirmSubscriptionFromSession(env, payload, session) {
     durationMinutes: Number(meta.durationMinutes || 45),
     status: "active",
     createdAt: new Date().toISOString(),
+    slotStart: meta.slotStart || "",
+    slotEnd: meta.slotEnd || "",
+    weekday: Number(meta.weekday || 0) || undefined,
+    format: meta.format || "in_person",
+    policyAcceptedAt: meta.policyAcceptedAt || "",
+    reservationId: reservationId || undefined,
   };
   const next = {
     ...payload,
+    reservations,
     subscriptions: [...(payload.subscriptions || []), record],
     updatedAt: new Date().toISOString(),
   };
@@ -285,7 +366,7 @@ function activeTrialExists(bookings, emailNorm) {
   );
 }
 
-async function assertSlotOpen(env, payload, start, end) {
+async function assertSlotOpen(env, payload, start, end, durationMinutes = PUBLIC_TRIAL_MINUTES) {
   const busyIntervals = await fetchGoogleBusyIntervals(
     env,
     start,
@@ -294,13 +375,15 @@ async function assertSlotOpen(env, payload, start, end) {
   const open = generateAvailableSlots({
     from: start,
     to: new Date(new Date(end).getTime() + 1000).toISOString(),
-    durationMinutes: PUBLIC_TRIAL_MINUTES,
+    durationMinutes,
     availability: payload.availability,
     holidays: payload.holidays,
-    bookings: payload.bookings,
+    bookings: busyBookings(payload),
     busyIntervals,
   });
-  return open.some((s) => s.start === start);
+  if (!open.some((s) => s.start === start)) {
+    throw new Error("That time is no longer available. Please pick another.");
+  }
 }
 
 export default {
@@ -398,6 +481,10 @@ export default {
         subscriptions: Array.isArray(body.subscriptions)
           ? body.subscriptions
           : current.subscriptions,
+        reservations: Array.isArray(body.reservations)
+          ? body.reservations
+          : current.reservations,
+        flyers: Array.isArray(body.flyers) ? body.flyers : current.flyers,
         updatedAt: new Date().toISOString(),
       });
       if (!isValidPayload(next)) {
@@ -429,7 +516,7 @@ export default {
         durationMinutes,
         availability: payload.availability,
         holidays: payload.holidays,
-        bookings: payload.bookings,
+        bookings: busyBookings(payload),
         busyIntervals,
       });
       return json(
@@ -456,7 +543,7 @@ export default {
         return json({ error: "Invalid JSON" }, 400, origin);
       }
 
-      const { start, end, name, email, notes = "", format } = body || {};
+      const { start, end, name, email, notes = "", format, flyer } = body || {};
       if (!start || !end || !name?.trim() || !email?.trim()) {
         return json(
           { error: "Name, email, start, and end are required." },
@@ -485,10 +572,11 @@ export default {
         );
       }
 
-      const open = await assertSlotOpen(env, payload, start, end);
-      if (!open) {
+      try {
+        await assertSlotOpen(env, payload, start, end, PUBLIC_TRIAL_MINUTES);
+      } catch (error) {
         return json(
-          { error: "That time was just taken. Please pick another slot." },
+          { error: error.message || "That time was just taken. Please pick another slot." },
           409,
           origin
         );
@@ -538,15 +626,34 @@ export default {
 
       const base = siteBase(env);
       try {
+        const flyerCode = flyer
+          ? String(flyer).trim().toLowerCase().replace(/[^a-z0-9_-]/g, "")
+          : "";
         const session = await createTrialCheckoutSession(env, {
           bookingId,
           email: emailNorm,
           name: booking.name,
           successUrl: `${base}/trial?success=1&session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: `${base}/trial?canceled=1`,
-          metadata: { format: String(format) },
+          metadata: {
+            format: String(format),
+            ...(flyerCode ? { flyer: flyerCode } : {}),
+          },
         });
 
+        if (flyerCode) {
+          const withFlyer = await readPayload(env);
+          const flyers = [...(withFlyer.flyers || [])];
+          const f = flyers.find((x) => x.code === flyerCode);
+          if (f) {
+            f.trials = (f.trials || 0) + 1;
+            await writePayload(env, {
+              ...withFlyer,
+              flyers,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        }
         const fresh = await readPayload(env);
         await writePayload(env, {
           ...fresh,
@@ -644,7 +751,41 @@ export default {
       );
     }
 
-    // Subscription checkout with mid-month proration
+    // Subscription checkout with reserved weekly slot + policy acceptance
+    if (request.method === "GET" && route === "/studio/subscription/slots") {
+      const mins = Number(url.searchParams.get("durationMinutes") || 45);
+      if (![30, 45, 60].includes(mins)) {
+        return json({ error: "durationMinutes must be 30, 45, or 60." }, 400, origin);
+      }
+      const payload = await readPayload(env);
+      const from = new Date().toISOString();
+      const to = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString();
+      let busyIntervals = [];
+      try {
+        busyIntervals = await fetchGoogleBusyIntervals(env, from, to);
+      } catch {
+        busyIntervals = [];
+      }
+      const slots = generateAvailableSlots({
+        from,
+        to,
+        durationMinutes: mins,
+        availability: payload.availability,
+        holidays: payload.holidays,
+        bookings: busyBookings(payload),
+        busyIntervals,
+      });
+      return json(
+        {
+          slots,
+          availability: publicStudio(payload).availability,
+          googleCalendar: googleCalendarConfigured(env),
+        },
+        200,
+        origin
+      );
+    }
+
     if (request.method === "POST" && route === "/studio/subscription/checkout") {
       let body;
       try {
@@ -652,7 +793,16 @@ export default {
       } catch {
         return json({ error: "Invalid JSON" }, 400, origin);
       }
-      const { name, email, durationMinutes, startDate } = body || {};
+      const {
+        name,
+        email,
+        durationMinutes,
+        start,
+        end,
+        format,
+        policyAccepted,
+        notes,
+      } = body || {};
       const mins = Number(durationMinutes);
       if (!name?.trim() || !email?.trim() || ![30, 45, 60].includes(mins)) {
         return json(
@@ -661,19 +811,85 @@ export default {
           origin
         );
       }
+      if (!start || !end) {
+        return json(
+          { error: "Choose your weekly lesson day and time before checkout." },
+          400,
+          origin
+        );
+      }
+      if (!policyAccepted) {
+        return json(
+          { error: "Please agree to the studio policy before continuing." },
+          400,
+          origin
+        );
+      }
+      if (format && !PUBLIC_FORMATS.has(format)) {
+        return json({ error: "Invalid lesson format." }, 400, origin);
+      }
       if (!env.STRIPE_SECRET_KEY) {
         return json({ error: "Stripe is not configured." }, 503, origin);
+      }
+
+      const payload = await readPayload(env);
+      try {
+        await assertSlotOpen(env, payload, start, end, mins);
+      } catch (error) {
+        return json({ error: error.message }, 409, origin);
+      }
+
+      const startDate = new Date(start);
+      const weekdayParts = new Intl.DateTimeFormat("en-US", {
+        timeZone: payload.availability.timezone || "America/New_York",
+        weekday: "short",
+      }).formatToParts(startDate);
+      const wdLabel = weekdayParts.find((p) => p.type === "weekday")?.value;
+      const preferredWeekday =
+        wdLabel === "Mon" ? 1 : wdLabel === "Sat" ? 6 : null;
+      if (!preferredWeekday) {
+        return json(
+          { error: "Weekly lessons must start on Monday or Saturday." },
+          400,
+          origin
+        );
       }
 
       let proration;
       try {
         proration = computeProration({
           durationMinutes: mins,
-          startDate: startDate ? new Date(startDate) : new Date(),
+          preferredWeekday,
+          startDate,
         });
       } catch (error) {
         return json({ error: error.message }, 400, origin);
       }
+
+      const reservationId = newId("res");
+      const expiresAt = new Date(Date.now() + 45 * 60 * 1000).toISOString();
+      const policyAcceptedAt = new Date().toISOString();
+      const reservation = {
+        id: reservationId,
+        start,
+        end,
+        name: String(name).trim(),
+        email: String(email).trim().toLowerCase(),
+        notes: notes ? String(notes).trim() : "",
+        format: format || "in_person",
+        durationMinutes: mins,
+        weekday: preferredWeekday,
+        status: "held",
+        createdAt: policyAcceptedAt,
+        expiresAt,
+        policyAcceptedAt,
+      };
+
+      await writePayload(env, {
+        ...payload,
+        reservations: [...(payload.reservations || []), reservation],
+        updatedAt: new Date().toISOString(),
+      });
 
       const priceEnvKey = `STRIPE_PRICE_${mins}`;
       const priceId = env[priceEnvKey] || "";
@@ -681,24 +897,43 @@ export default {
 
       try {
         const session = await createSubscriptionCheckoutSession(env, {
-          email: String(email).trim().toLowerCase(),
-          name: String(name).trim(),
+          email: reservation.email,
+          name: reservation.name,
           durationMinutes: mins,
           monthlyRateCents: proration.monthlyRateCents,
           prorateCents: proration.prorateCents,
           priceId: priceId || undefined,
-          successUrl: `${base}/?sub=success&session_id={CHECKOUT_SESSION_ID}`,
-          cancelUrl: `${base}/?sub=canceled`,
+          successUrl: `${base}/subscribe/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${base}/subscribe?canceled=1`,
           billingCycleAnchor: proration.billingCycleAnchor,
           metadata: {
+            reservationId,
+            slotStart: start,
+            slotEnd: end,
+            weekday: String(preferredWeekday),
+            format: reservation.format,
+            policyAcceptedAt,
             remainingLessons: String(proration.remainingLessons),
-            lessonsInFullMonth: String(proration.lessonsInFullMonth),
+            perLessonCents: String(proration.perLessonCents),
           },
         });
+
+        const fresh = await readPayload(env);
+        await writePayload(env, {
+          ...fresh,
+          reservations: (fresh.reservations || []).map((r) =>
+            r.id === reservationId
+              ? { ...r, stripeSessionId: session.id }
+              : r
+          ),
+          updatedAt: new Date().toISOString(),
+        });
+
         return json(
           {
             url: session.url,
             sessionId: session.id,
+            reservationId,
             proration,
           },
           200,
@@ -715,9 +950,13 @@ export default {
 
     if (request.method === "GET" && route === "/studio/subscription/proration") {
       const mins = Number(url.searchParams.get("durationMinutes") || 45);
+      const preferredWeekday = Number(url.searchParams.get("weekday") || 0);
       try {
         const proration = computeProration({
           durationMinutes: mins,
+          preferredWeekday: preferredWeekday === 1 || preferredWeekday === 6
+            ? preferredWeekday
+            : undefined,
           startDate: url.searchParams.get("startDate")
             ? new Date(url.searchParams.get("startDate"))
             : new Date(),
@@ -726,6 +965,53 @@ export default {
       } catch (error) {
         return json({ error: error.message }, 400, origin);
       }
+    }
+
+    // Flyer tracking
+    if (request.method === "GET" && route === "/studio/flyers") {
+      const token = getBearer(request);
+      if (!env.ADMIN_TOKEN || token !== env.ADMIN_TOKEN) {
+        return json({ error: "Unauthorized" }, 401, origin);
+      }
+      const payload = await readPayload(env);
+      return json({ flyers: payload.flyers || [] }, 200, origin);
+    }
+
+    if (request.method === "POST" && route === "/studio/flyers/hit") {
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return json({ error: "Invalid JSON" }, 400, origin);
+      }
+      const code = String(body?.code || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, "");
+      if (!code) {
+        return json({ error: "code required" }, 400, origin);
+      }
+      const payload = await readPayload(env);
+      const flyers = [...(payload.flyers || [])];
+      let flyer = flyers.find((f) => f.code === code);
+      if (!flyer) {
+        flyer = {
+          code,
+          label: code,
+          views: 0,
+          trials: 0,
+          createdAt: new Date().toISOString(),
+        };
+        flyers.push(flyer);
+      }
+      flyer.views = (flyer.views || 0) + 1;
+      flyer.lastSeenAt = new Date().toISOString();
+      await writePayload(env, {
+        ...payload,
+        flyers,
+        updatedAt: new Date().toISOString(),
+      });
+      return json({ flyer: { code: flyer.code, label: flyer.label } }, 200, origin);
     }
 
     if (request.method === "GET" && route === "/studio/booking") {

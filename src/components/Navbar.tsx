@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
 import { analytics } from "../utils/analytics";
 import { PUBLIC_BOOKING_COPY } from "../lib/bookingPolicy";

@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect, useMemo, useState } from "react";
 import { loadStudio } from "../../lib/studioApi";
 import { HolidayWeek, StudioEvent } from "../../types/studio";

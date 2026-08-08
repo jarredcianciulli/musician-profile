@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect } from "react";
 import { useAnimate, useReducedMotion } from "framer-motion";
 import {

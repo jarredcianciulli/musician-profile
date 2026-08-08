@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState } from "react";
 
 /** Client matchMedia with sync initial value (CRA CSR). */

@@ -38,6 +38,7 @@ jobs:
           rsync -a --delete \
             --exclude node_modules \
             --exclude build \
+            --exclude .next \
             --exclude .git \
             --exclude workers \
             --exclude .env \
@@ -49,6 +50,26 @@ jobs:
           if [ ! -f "$DEPLOY_DIR/.env" ]; then
             cp "$DEPLOY_DIR/env.production.example" "$DEPLOY_DIR/.env"
             echo "::warning::Seeded .env from env.production.example — set API URLs on the Pi."
+          fi
+          # Migrate CRA REACT_APP_* → NEXT_PUBLIC_* when Next keys are missing
+          ENV_FILE="$DEPLOY_DIR/.env"
+          for key in CONTACT_ENDPOINT STUDIO_API WEBSITE_DOMAIN LAB_URL METHOD_URL STUDIO_EMAIL; do
+            if ! grep -q "^NEXT_PUBLIC_${key}=" "$ENV_FILE" 2>/dev/null; then
+              val=$(grep "^REACT_APP_${key}=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- || true)
+              if [ -n "${val:-}" ]; then
+                echo "NEXT_PUBLIC_${key}=$val" >> "$ENV_FILE"
+                echo "Migrated REACT_APP_${key} → NEXT_PUBLIC_${key}"
+              fi
+            fi
+          done
+          # Staging hostname when deploying staging branch
+          if [ "${{ steps.env.outputs.name }}" = "staging" ]; then
+            if grep -q "^NEXT_PUBLIC_WEBSITE_DOMAIN=https://batterystringstudio.com" "$ENV_FILE" 2>/dev/null; then
+              sed -i 's|^NEXT_PUBLIC_WEBSITE_DOMAIN=https://batterystringstudio.com|NEXT_PUBLIC_WEBSITE_DOMAIN=https://staging.batterystringstudio.com|' "$ENV_FILE" || true
+            fi
+            if ! grep -q "^NEXT_PUBLIC_WEBSITE_DOMAIN=" "$ENV_FILE"; then
+              echo "NEXT_PUBLIC_WEBSITE_DOMAIN=https://staging.batterystringstudio.com" >> "$ENV_FILE"
+            fi
           fi
 
       - name: Build and start containers

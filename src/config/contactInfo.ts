@@ -1,7 +1,7 @@
 import { brand } from "./brand";
+import { studioEmail } from "@/lib/env";
 
-const email =
-  process.env.REACT_APP_STUDIO_EMAIL || "jarred@batterystringstudio.com";
+const email = studioEmail();
 
 /**
  * Public location copy only — never put a street address here.
@@ -10,9 +10,9 @@ const email =
 export const contactInfo = {
   email,
   emailPersonal:
-    process.env.REACT_APP_STUDIO_EMAIL_PERSONAL ||
+    process.env.NEXT_PUBLIC_STUDIO_EMAIL_PERSONAL ||
     "jarred@batterystringstudio.com",
-  phone: process.env.REACT_APP_STUDIO_PHONE || "(610) 340-8827",
+  phone: process.env.NEXT_PUBLIC_STUDIO_PHONE || "(610) 340-8827",
   city: "Charleston",
   state: "SC",
   area: "Charleston",
@@ -22,7 +22,7 @@ export const contactInfo = {
   websiteUrl: brand.websiteUrl,
   bookingLink: "#book",
   social: {
-    facebook: process.env.REACT_APP_FACEBOOK_URL || "https://facebook.com",
-    instagram: process.env.REACT_APP_INSTAGRAM_URL || "https://instagram.com",
+    facebook: process.env.NEXT_PUBLIC_FACEBOOK_URL || "https://facebook.com",
+    instagram: process.env.NEXT_PUBLIC_INSTAGRAM_URL || "https://instagram.com",
   },
 };

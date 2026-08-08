@@ -1,3 +1,5 @@
+"use client";
+
 import React, {
   createContext,
   useCallback,
@@ -5,10 +7,10 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { useNavigate } from "react-router-dom";
-import { analytics } from "../utils/analytics";
-import { useIsDesktopBooking } from "../hooks/useMediaQuery";
-import TrialBookingDesktop from "../components/booking/TrialBookingDesktop";
+import { useRouter } from "next/navigation";
+import { analytics } from "@/utils/analytics";
+import { useIsDesktopBooking } from "@/hooks/useMediaQuery";
+import TrialBookingDesktop from "@/components/booking/TrialBookingDesktop";
 
 type BookingContextValue = {
   openBooking: (source: string) => void;
@@ -19,7 +21,7 @@ type BookingContextValue = {
 const BookingContext = createContext<BookingContextValue | null>(null);
 
 export function BookingProvider({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
+  const router = useRouter();
   const isDesktop = useIsDesktopBooking();
   const [isDesktopOpen, setDesktopOpen] = useState(false);
 
@@ -29,10 +31,10 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
       if (isDesktop) {
         setDesktopOpen(true);
       } else {
-        navigate("/trial");
+        router.push("/trial");
       }
     },
-    [isDesktop, navigate]
+    [isDesktop, router]
   );
 
   const closeBooking = useCallback(() => {

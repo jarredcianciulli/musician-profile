@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import teacherImage from "../assets/headshots/unnamed.jpg";
 
@@ -68,7 +70,7 @@ const About: React.FC = () => {
           <div className="relative">
             <div className="aspect-[3/4] w-full max-w-xs mx-auto rounded-2xl lg:rounded-3xl shadow-md overflow-hidden">
               <img
-                src={teacherImage}
+                src={teacherImage.src}
                 alt="Music teacher"
                 className="w-full h-full object-cover"
               />

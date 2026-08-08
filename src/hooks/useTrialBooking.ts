@@ -1,5 +1,7 @@
+"use client";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "next/navigation";
 import {
   BookingConfirmation,
   dayKey,
@@ -7,16 +9,16 @@ import {
   fetchBookingBySession,
   formatSlotDay,
   startTrialCheckout,
-} from "../lib/bookingApi";
-import { PUBLIC_TRIAL_MINUTES } from "../lib/bookingPolicy";
-import { AvailabilityConfig, LessonFormat, TimeSlot } from "../types/studio";
-import { defaultAvailability } from "../data/seedStudio";
-import { analytics } from "../utils/analytics";
+} from "@/lib/bookingApi";
+import { PUBLIC_TRIAL_MINUTES } from "@/lib/bookingPolicy";
+import { AvailabilityConfig, LessonFormat, TimeSlot } from "@/types/studio";
+import { defaultAvailability } from "@/data/seedStudio";
+import { analytics } from "@/utils/analytics";
 
 export type TrialStep = 1 | 2 | 3 | 4;
 
-export function useTrialBooking() {
-  const [searchParams] = useSearchParams();
+export function useTrialBooking(flyerCode?: string) {
+  const searchParams = useSearchParams();
   const [step, setStep] = useState<TrialStep>(1);
   const [availability, setAvailability] =
     useState<AvailabilityConfig>(defaultAvailability);
@@ -38,6 +40,8 @@ export function useTrialBooking() {
   const successParam = searchParams.get("success");
   const sessionId = searchParams.get("session_id");
   const canceled = searchParams.get("canceled");
+  const flyer =
+    flyerCode || searchParams.get("f") || searchParams.get("flyer") || "";
 
   useEffect(() => {
     let cancelled = false;
@@ -157,16 +161,17 @@ export function useTrialBooking() {
         email: email.trim(),
         notes: notes.trim(),
         format,
+        flyer: flyer || undefined,
       });
       window.location.href = result.url;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed.");
       setSubmitting(false);
     }
-  }, [selectedSlot, name, email, notes, format]);
+  }, [selectedSlot, name, email, notes, format, flyer]);
 
   const canContinue =
-    (step === 1) ||
+    step === 1 ||
     (step === 2 && Boolean(selectedSlot)) ||
     (step === 3 && Boolean(name.trim() && email.trim())) ||
     step === 4;
@@ -201,6 +206,7 @@ export function useTrialBooking() {
     confirmation,
     pay,
     canContinue,
+    flyer,
   };
 }
 

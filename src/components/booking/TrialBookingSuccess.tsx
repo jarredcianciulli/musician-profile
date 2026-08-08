@@ -1,5 +1,7 @@
+"use client";
+
 import React from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import {
   formatSlotDay,
   formatSlotTime,
@@ -75,7 +77,7 @@ const TrialBookingSuccess: React.FC<Props> = ({ booking, onDone }) => {
           Back to home
         </button>
       ) : (
-        <Link to="/" className="btn-primary inline-flex w-full justify-center">
+        <Link href="/" className="btn-primary inline-flex w-full justify-center">
           Back to home
         </Link>
       )}

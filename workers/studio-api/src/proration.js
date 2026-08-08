@@ -1,13 +1,12 @@
 /**
- * Mid-month proration: charge for remaining weekly lessons in the
- * current calendar month (America/New_York), then full monthly rate next cycle.
+ * Mid-month proration: first partial month billed per lesson at the regular
+ * rate ((monthly × 12) / 46 teaching weeks), then full monthly from the 1st.
  *
- * Windows: Mon 18:00–20:00, Sat 08:00–11:00.
- * A subscription is ONE lesson per week (student picks a day). Without a
- * preferred day we average remaining Mon/Sat opportunities as a ballpark.
+ * A subscription is ONE weekly lesson — preferredWeekday 1=Mon or 6=Sat.
  */
 
 const RATES = { 30: 160, 45: 220, 60: 310 };
+const TEACHING_WEEKS_PER_YEAR = 46; // ~52 − 6 studio-off weeks
 const TIME_ZONE = "America/New_York";
 
 function zonedParts(date) {
@@ -40,12 +39,11 @@ function windowEndHour(weekday) {
   return null;
 }
 
-function countStudioDays(from, toExclusive) {
+/** Count remaining Mon or Sat dates from `from` through day before `toExclusive`. */
+function countWeekdayOccurrences(from, toExclusive, preferredWeekday) {
   const start = zonedParts(from);
   const end = zonedParts(toExclusive);
-  let mondays = 0;
-  let saturdays = 0;
-
+  let count = 0;
   let y = start.year;
   let m = start.month;
   let d = start.day;
@@ -64,7 +62,7 @@ function countStudioDays(from, toExclusive) {
     const wd = WEEKDAY[p.weekday];
     const endH = windowEndHour(wd);
 
-    if (endH !== null) {
+    if (wd === preferredWeekday && endH !== null) {
       const isToday =
         p.year === start.year &&
         p.month === start.month &&
@@ -73,11 +71,7 @@ function countStudioDays(from, toExclusive) {
         !isToday ||
         start.hour < endH ||
         (start.hour === endH && start.minute === 0);
-
-      if (stillOpen) {
-        if (wd === 1) mondays += 1;
-        if (wd === 6) saturdays += 1;
-      }
+      if (stillOpen) count += 1;
     }
 
     const next = new Date(Date.UTC(y, m - 1, d + 1, 16, 0, 0));
@@ -87,13 +81,11 @@ function countStudioDays(from, toExclusive) {
     d = np.day;
   }
 
-  return { mondays, saturdays };
+  return count;
 }
 
-function weeklyEstimate({ mondays, saturdays }) {
-  if (mondays === 0) return saturdays;
-  if (saturdays === 0) return mondays;
-  return Math.round((mondays + saturdays) / 2);
+export function perLessonCents(monthlyRateDollars) {
+  return Math.round((monthlyRateDollars * 12 * 100) / TEACHING_WEEKS_PER_YEAR);
 }
 
 export function computeProration({
@@ -105,49 +97,35 @@ export function computeProration({
   if (!rate) {
     throw new Error("Invalid lesson duration for subscription.");
   }
+  if (preferredWeekday !== 1 && preferredWeekday !== 6) {
+    throw new Error("Choose a weekly lesson day (Monday or Saturday).");
+  }
 
   const start = new Date(startDate);
   const p = zonedParts(start);
-  const monthStart = new Date(Date.UTC(p.year, p.month - 1, 1, 5, 0, 0));
   const nextMonth = new Date(Date.UTC(p.year, p.month, 1, 5, 0, 0));
 
-  const full = countStudioDays(monthStart, nextMonth);
-  const rem = countStudioDays(start, nextMonth);
-
-  const lessonsInFullMonth = Math.max(
-    1,
-    preferredWeekday === 1
-      ? full.mondays
-      : preferredWeekday === 6
-        ? full.saturdays
-        : weeklyEstimate(full)
+  const remainingLessons = countWeekdayOccurrences(
+    start,
+    nextMonth,
+    preferredWeekday
   );
-
-  const remainingLessons =
-    preferredWeekday === 1
-      ? rem.mondays
-      : preferredWeekday === 6
-        ? rem.saturdays
-        : weeklyEstimate(rem);
-
-  const prorateDollars =
-    remainingLessons <= 0
-      ? 0
-      : Math.round((rate * remainingLessons) / lessonsInFullMonth);
+  const lessonCents = perLessonCents(rate);
+  const prorateCents = remainingLessons * lessonCents;
 
   return {
     durationMinutes,
+    preferredWeekday,
     monthlyRate: rate,
     monthlyRateCents: rate * 100,
-    lessonsInFullMonth,
+    perLessonCents: lessonCents,
+    perLessonDollars: lessonCents / 100,
     remainingLessons,
-    remainingMondays: rem.mondays,
-    remainingSaturdays: rem.saturdays,
-    prorateDollars,
-    prorateCents: prorateDollars * 100,
+    prorateDollars: prorateCents / 100,
+    prorateCents,
     billingCycleAnchor: Math.floor(nextMonth.getTime() / 1000),
     nextCycleStartIso: nextMonth.toISOString(),
   };
 }
 
-export { RATES };
+export { RATES, TEACHING_WEEKS_PER_YEAR };

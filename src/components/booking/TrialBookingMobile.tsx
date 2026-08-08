@@ -1,5 +1,7 @@
+"use client";
+
 import React, { useEffect } from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { useAnimate, useReducedMotion } from "framer-motion";
 import { brand } from "../../config/brand";
 import LogoLockup from "../brand/LogoLockup";
@@ -48,7 +50,7 @@ const TrialBookingMobile: React.FC<Props> = ({ onClose }) => {
     </button>
   ) : (
     <Link
-      to="/"
+      href="/"
       className="text-sm text-muted hover:text-ink px-2 py-1"
       aria-label="Close"
     >
@@ -75,7 +77,7 @@ const TrialBookingMobile: React.FC<Props> = ({ onClose }) => {
           Cancel
         </button>
       ) : (
-        <Link to="/" className="btn-secondary flex-1 text-center">
+        <Link href="/" className="btn-secondary flex-1 text-center">
           Cancel
         </Link>
       )}
