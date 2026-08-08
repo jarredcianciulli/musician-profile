@@ -70,6 +70,13 @@ jobs:
             if ! grep -q "^NEXT_PUBLIC_WEBSITE_DOMAIN=" "$ENV_FILE"; then
               echo "NEXT_PUBLIC_WEBSITE_DOMAIN=https://staging.batterystringstudio.com" >> "$ENV_FILE"
             fi
+            # Point staging site at Stripe-test Worker (not live booking-api)
+            STAGING_API="https://studio-api-staging.batterystringstudio.workers.dev"
+            if grep -q "^NEXT_PUBLIC_STUDIO_API=" "$ENV_FILE" 2>/dev/null; then
+              sed -i "s|^NEXT_PUBLIC_STUDIO_API=.*|NEXT_PUBLIC_STUDIO_API=${STAGING_API}|" "$ENV_FILE" || true
+            else
+              echo "NEXT_PUBLIC_STUDIO_API=${STAGING_API}" >> "$ENV_FILE"
+            fi
           fi
 
       - name: Build and start containers

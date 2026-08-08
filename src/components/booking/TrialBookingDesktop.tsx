@@ -61,7 +61,7 @@ function TrialBookingDesktopPanel({ onClose }: Props) {
     (booking.step === 3 && (!booking.name.trim() || !booking.email.trim()));
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
       <div
         ref={backdropRef}
         className="absolute inset-0 bg-ink/45 opacity-0"

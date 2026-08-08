@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_CONTACT_ENDPOINT: ${NEXT_PUBLIC_CONTACT_ENDPOINT:-https://api.jarredcianciulli.com/contact}
-        NEXT_PUBLIC_STUDIO_API: ${NEXT_PUBLIC_STUDIO_API:-https://booking-api.batterystringstudio.com}
+        NEXT_PUBLIC_STUDIO_API: ${NEXT_PUBLIC_STUDIO_API:-https://studio-api-staging.batterystringstudio.workers.dev}
         NEXT_PUBLIC_WEBSITE_DOMAIN: ${NEXT_PUBLIC_WEBSITE_DOMAIN:-https://staging.batterystringstudio.com}
         NEXT_PUBLIC_LAB_URL: ${NEXT_PUBLIC_LAB_URL:-https://lab-staging.batterystringstudio.com}
         NEXT_PUBLIC_METHOD_URL: ${NEXT_PUBLIC_METHOD_URL:-https://method-staging.batterystringstudio.com}

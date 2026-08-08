@@ -206,8 +206,8 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
   if (!isOpen || !mounted) return null;
 
   const shellClass = mobile
-    ? "fixed inset-0 z-[100] bg-paper flex flex-col"
-    : "fixed inset-0 z-[100] flex items-center justify-center p-6";
+    ? "fixed inset-0 z-[110] bg-paper flex flex-col"
+    : "fixed inset-0 z-[110] flex items-center justify-center p-6";
 
   const panel = (
     <div

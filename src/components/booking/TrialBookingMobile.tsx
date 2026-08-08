@@ -109,7 +109,7 @@ const TrialBookingMobile: React.FC<Props> = ({ onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-paper flex flex-col"
+      className="fixed inset-0 z-[110] bg-paper flex flex-col"
       style={{
         height: "100dvh",
         maxHeight: "100dvh",

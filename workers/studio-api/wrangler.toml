@@ -6,11 +6,8 @@ compatibility_date = "2024-11-07"
 account_id = "60fd79cf6ab3ec1f0525b598cfaef56b"
 
 # Custom domain (Workers → Domains): booking-api.batterystringstudio.com
+# Staging: booking-api-staging.batterystringstudio.com → studio-api-staging
 # Prefer custom domain over zone routes — api.* is already used by the tunnel/Caddy stack.
-# Zone Workers Routes Edit is also required if you switch back to routes on api.*.
-# routes = [
-#   { pattern = "api.batterystringstudio.com/studio*", zone_name = "batterystringstudio.com" },
-# ]
 
 [[kv_namespaces]]
 binding = "STUDIO_KV"
@@ -27,3 +24,22 @@ FROM_NAME = "Battery String Studio"
 [env.dev.vars]
 WEBSITE_DOMAIN = "http://localhost:3000"
 CORS_ORIGINS = "http://localhost:3000"
+
+# Stripe test keys + separate KV — do not share prod secrets/KV
+[env.staging]
+name = "studio-api-staging"
+workers_dev = true
+routes = [
+  { pattern = "booking-api-staging.batterystringstudio.com/*", zone_name = "batterystringstudio.com" },
+]
+
+[[env.staging.kv_namespaces]]
+binding = "STUDIO_KV"
+id = "73816b8d49a54fe490cbc13161e6dfb6"
+
+[env.staging.vars]
+WEBSITE_DOMAIN = "https://staging.batterystringstudio.com"
+CORS_ORIGINS = "https://staging.batterystringstudio.com,http://localhost:3000"
+FROM_EMAIL = "jarred@batterystringstudio.com"
+TO_EMAIL = "jarred@batterystringstudio.com"
+FROM_NAME = "Battery String Studio"

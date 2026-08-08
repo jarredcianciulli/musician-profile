@@ -88,6 +88,32 @@ CORS: apex, www, staging, localhost.
 Stripe webhook: `https://booking-api.batterystringstudio.com/studio/booking/webhook`  
 Flyer QR: `https://batterystringstudio.com/trial`
 
+### studio-api staging (Stripe **test** mode)
+
+Separate Worker so sandbox Checkout never uses live keys or prod KV:
+
+```bash
+cd workers/studio-api
+npx wrangler kv namespace create STUDIO_KV --env staging   # already done; id in wrangler.toml
+npx wrangler secret put STRIPE_SECRET_KEY --env staging      # sk_test_…
+npx wrangler secret put STRIPE_WEBHOOK_SECRET --env staging
+npx wrangler secret put BREVO_API_KEY --env staging
+npx wrangler secret put ADMIN_TOKEN --env staging
+npx wrangler deploy --env staging
+```
+
+| | Staging | Production |
+|--|---------|------------|
+| Worker | `studio-api-staging` | `studio-api` |
+| Default URL | `https://studio-api-staging.batterystringstudio.workers.dev` | `https://booking-api.batterystringstudio.com` |
+| Optional hostname | `booking-api-staging.batterystringstudio.com` (Workers Domains + DNS) | `booking-api…` |
+| Stripe | test | live |
+
+Test webhook: `https://studio-api-staging.batterystringstudio.workers.dev/studio/booking/webhook`  
+Events: `checkout.session.completed`, `checkout.session.expired`.
+
+Staging site `NEXT_PUBLIC_STUDIO_API` must point at the staging Worker (deploy workflow sets this on `staging` branch).
+
 Site `REACT_APP_*` on Pi `~/bss/studio/prod/.env`:
 
 ```bash
