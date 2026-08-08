@@ -3,22 +3,37 @@
   "name": "Battery String Studio — Violin & Viola Lessons",
   "icons": [
     {
-      "src": "favicon.svg",
+      "src": "/favicon.svg",
       "type": "image/svg+xml",
-      "sizes": "any"
+      "sizes": "any",
+      "purpose": "any"
     },
     {
-      "src": "icon-192.png",
+      "src": "/favicon-32.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "32x32",
+      "purpose": "any"
     },
     {
-      "src": "icon-512.png",
+      "src": "/apple-touch-icon.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "180x180",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
   "theme_color": "#1B2A3A",
   "background_color": "#F7F4EF"

@@ -59,7 +59,23 @@ Ad / lead URLs: `https://batterystringstudio.com/lead?f={code}&utm_source=…`
 4. Search Console + Bing — submit sitemap after prod deploy
 5. Ongoing: Google reviews
 
-## Studio API — production (live Stripe)
+## Branding: Stripe Checkout + site icons
+
+### Stripe Checkout logo
+
+**Upload in the Stripe Dashboard** (not required in checkout API code for day-to-day branding):
+
+1. [Settings → Branding](https://dashboard.stripe.com/settings/branding) (and **Checkout branding** if shown)
+2. Do this in **Test mode** and **Live mode** separately
+3. Upload a square **icon** (≥128×128, PNG/JPG, &lt;512KB) — use `public/brand/bss-nav-lockup-250.png` or the bow-string mark
+4. Optional wider **logo** for the Checkout header
+
+That branding applies to hosted Checkout, receipts, etc. You *can* override per session via `branding_settings` in the API, but Dashboard upload is enough.
+
+### Browser / mobile icons (site)
+
+Already in `public/`: `favicon.svg`, `favicon-32.png`, `apple-touch-icon.png` (180), `icon-192.png`, `icon-512.png`, plus `manifest.json`.  
+Wired in root metadata (`src/lib/siteMetadata.ts`) so tabs, iOS home screen, and PWA install pick them up.
 
 ```bash
 cd workers/studio-api

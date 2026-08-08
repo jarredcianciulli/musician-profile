@@ -20,6 +20,23 @@ export function buildRootMetadata(): Metadata {
     },
     description:
       "Private violin and viola lessons in the Bowan Village / Charleston area. $35 trial lessons and weekly subscriptions with Jarred Cianciulli.",
+    applicationName: "Battery String Studio",
+    icons: {
+      icon: [
+        { url: "/favicon.svg", type: "image/svg+xml" },
+        { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+        { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+        { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+      ],
+      apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+      shortcut: ["/favicon-32.png"],
+    },
+    manifest: "/manifest.json",
+    appleWebApp: {
+      capable: true,
+      title: "Battery String Studio",
+      statusBarStyle: "default",
+    },
     openGraph: {
       type: "website",
       locale: "en_US",
