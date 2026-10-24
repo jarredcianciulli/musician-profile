@@ -176,6 +176,10 @@ export type StudentEnrollment = {
   policyAcceptedAt?: string;
   /** Admin-only freeform notes (custom info widget). */
   adminNotes?: string;
+  /** subscription (weekly) vs trial invite */
+  inviteKind?: "subscription" | "trial" | string;
+  trialBookingId?: string;
+  trialWaived?: boolean;
   createdAt?: string;
   updatedAt?: string;
   cancelledAt?: string;

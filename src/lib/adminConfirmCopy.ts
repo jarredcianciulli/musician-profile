@@ -1,5 +1,6 @@
 export type AdminConfirmAction =
   | "sendInvite"
+  | "sendTrialInvite"
   | "resendMagicLink"
   | "cancelInvite"
   | "openAsStudent";
@@ -8,6 +9,8 @@ export type AdminConfirmVars = {
   name?: string;
   email?: string;
   billingMode?: string;
+  amountLabel?: string;
+  waived?: boolean;
 };
 
 export type AdminConfirmCopy = {
@@ -36,6 +39,16 @@ export function getAdminConfirmCopy(
             : ""
         }. They’ll be able to open their account and set up payment.`,
         confirmLabel: "Send invite",
+      };
+    case "sendTrialInvite":
+      return {
+        title: vars.waived ? "Send complimentary trial?" : "Send trial invite?",
+        body: vars.waived
+          ? `Email ${who} a complimentary trial invite (no payment). Creates a pending account and books the lesson time.`
+          : `Email ${who} a trial invite${
+              vars.amountLabel ? ` for ${vars.amountLabel}` : ""
+            } with a Stripe pay link. Creates a pending account until they pay / continue.`,
+        confirmLabel: vars.waived ? "Send complimentary trial" : "Send trial invite",
       };
     case "resendMagicLink":
       return {

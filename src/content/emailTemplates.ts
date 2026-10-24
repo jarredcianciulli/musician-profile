@@ -27,6 +27,35 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     ],
   },
   {
+    id: "trial_invite",
+    name: "Trial invite (paid)",
+    audience: "student",
+    subject: "Your trial lesson ($XX) — Battery String Studio",
+    description:
+      "Admin-sent trial with custom price and Stripe pay link, plus account magic link.",
+    outline: [
+      "You're invited",
+      "Trial length + price",
+      "When / format",
+      "Pay for your trial (Stripe)",
+      "Open your account",
+    ],
+  },
+  {
+    id: "trial_invite_waived",
+    name: "Trial invite (complimentary)",
+    audience: "student",
+    subject: "Your complimentary trial lesson — Battery String Studio",
+    description:
+      "Admin-sent free trial — no Stripe link; account magic link only.",
+    outline: [
+      "Complimentary trial",
+      "When / format",
+      "Open your account",
+      "No payment required",
+    ],
+  },
+  {
     id: "trial_client",
     name: "Trial confirmation (student)",
     audience: "student",

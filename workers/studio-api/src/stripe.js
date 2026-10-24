@@ -86,8 +86,17 @@ export async function createTrialCheckoutSession(env, {
   name,
   successUrl,
   cancelUrl,
+  /** Cents — default $35 public trial */
+  amountCents = 3500,
+  durationMinutes = 30,
   metadata = {},
 }) {
+  const cents = Math.max(0, Math.round(Number(amountCents) || 0));
+  if (cents <= 0) {
+    throw new Error("Trial Checkout amount must be greater than 0.");
+  }
+  const dollars = (cents / 100).toFixed(cents % 100 === 0 ? 0 : 2);
+  const mins = durationMinutes || 30;
   return stripeRequest(env, "POST", "/checkout/sessions", {
     mode: "payment",
     customer_email: email,
@@ -99,10 +108,10 @@ export async function createTrialCheckoutSession(env, {
         quantity: 1,
         price_data: {
           currency: "usd",
-          unit_amount: 3500,
+          unit_amount: cents,
           product_data: {
             name: "Battery String Studio — Trial lesson",
-            description: "30-minute violin/viola trial ($35)",
+            description: `${mins}-minute violin/viola trial ($${dollars})`,
           },
         },
       },

@@ -1186,6 +1186,8 @@ export default {
           bookingId,
           email: emailNorm,
           name: booking.name,
+          amountCents: booking.amountCents || PUBLIC_TRIAL_PRICE_CENTS,
+          durationMinutes: PUBLIC_TRIAL_MINUTES,
           successUrl: `${base}/trial?success=1&session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: `${base}/trial?canceled=1&bid=${bookingId}`,
           metadata: {

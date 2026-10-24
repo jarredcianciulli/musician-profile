@@ -22,6 +22,25 @@ export function sampleHtmlForTemplate(templateId: string): string {
       <p><a href="${SITE}/account" style="display:inline-block;padding:12px 18px;border:1px solid #1b3a5c;color:#1b3a5c;text-decoration:none">Request a new sign-in link</a></p>
       <p style="font-size:13px;color:#666">Or email <a href="mailto:${INBOX}">${INBOX}</a> and we&apos;ll resend it.</p>
     `);
+    case "trial_invite":
+      return wrap(`
+      <h2 style="font-weight:600">You're invited, Alex</h2>
+      <p>Your <strong>30-minute trial</strong> is reserved. Pay <strong>$35</strong> to confirm the spot.</p>
+      <p><strong>When:</strong> Saturday, November 1, 2026 at 10:00 AM<br/>
+      <strong>Format:</strong> In person (Bowan Village area)</p>
+      <p><a href="${SITE}/trial" style="display:inline-block;padding:12px 18px;background:#1b3a5c;color:#fff;text-decoration:none">Pay $35 for your trial</a></p>
+      <p style="font-size:14px;color:#444">You can also open your account (schedule and next steps):</p>
+      <p><a href="${SITE}/account" style="display:inline-block;padding:12px 18px;border:1px solid #1b3a5c;color:#1b3a5c;text-decoration:none">Open your account</a></p>
+    `);
+    case "trial_invite_waived":
+      return wrap(`
+      <h2 style="font-weight:600">You're invited, Alex</h2>
+      <p>You're set for a <strong>complimentary 30-minute trial</strong> — no payment needed.</p>
+      <p><strong>When:</strong> Saturday, November 1, 2026 at 10:00 AM<br/>
+      <strong>Format:</strong> In person (Bowan Village area)</p>
+      <p>Open your account anytime to see details and, when you're ready, set up weekly lessons.</p>
+      <p><a href="${SITE}/account" style="display:inline-block;padding:12px 18px;background:#1b3a5c;color:#fff;text-decoration:none">Open your account</a></p>
+    `);
     case "trial_client":
       return wrap(`
         <h2 style="font-weight:600">You're booked</h2>

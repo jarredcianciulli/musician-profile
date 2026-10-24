@@ -470,6 +470,47 @@ export type StudentInviteResult = {
   emailWarning?: string;
 };
 
+export type TrialInviteResult = {
+  enrollment: StudentEnrollment;
+  booking?: Record<string, unknown>;
+  magicUrl: string;
+  checkoutUrl?: string;
+  summary: string;
+  emailWarning?: string;
+};
+
+/** Admin: send a trial lesson invite (pending account + pay link or waived). */
+export async function inviteTrialStudent(
+  input: {
+    name: string;
+    email: string;
+    start: string;
+    end: string;
+    format?: LessonFormat;
+    durationMinutes?: 30 | 45;
+    /** Trial price in dollars (default 35). Ignored when waive is true. */
+    amountDollars?: number;
+    /** Complimentary trial — no Stripe link. */
+    waive?: boolean;
+  },
+  adminToken: string
+): Promise<TrialInviteResult> {
+  if (!apiBase) throw new Error("Trial invite requires the studio API.");
+  const res = await fetch(`${apiBase}/studio/students/trial-invite`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${adminToken}`,
+    },
+    body: JSON.stringify(input),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not send trial invite.");
+  }
+  return data as TrialInviteResult;
+}
+
 export async function inviteStudent(
   input: {
     name: string;

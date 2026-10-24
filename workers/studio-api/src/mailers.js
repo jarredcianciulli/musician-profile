@@ -169,6 +169,105 @@ export async function sendSubscriptionBookedEmails(env, sub, reservation) {
 }
 
 /**
+ * Admin trial invite — pay link or complimentary (waived).
+ * @returns {{ payload?: object, record?: object }}
+ */
+export async function sendTrialInviteEmail(
+  env,
+  {
+    name,
+    email,
+    magicUrl,
+    whenLabel,
+    format,
+    durationMinutes = 30,
+    amountCents = 0,
+    waived = false,
+    checkoutUrl = "",
+    enrollmentId = "",
+  },
+  payload = null
+) {
+  const inbox = studioInbox(env);
+  const formatText = formatLabel(format);
+  const mins = durationMinutes || 30;
+  const dollars = ((amountCents || 0) / 100).toFixed(
+    (amountCents || 0) % 100 === 0 ? 0 : 2
+  );
+
+  let bodyInner = "";
+  let subject = "";
+  if (waived) {
+    subject = "Your complimentary trial lesson — Battery String Studio";
+    bodyInner = `
+      <h2 style="font-weight:600">You're invited${name ? `, ${escapeHtml(name)}` : ""}</h2>
+      <p>You're set for a <strong>complimentary ${escapeHtml(String(mins))}-minute trial</strong> — no payment needed.</p>
+      <p><strong>When:</strong> ${escapeHtml(whenLabel)}<br/>
+      <strong>Format:</strong> ${escapeHtml(formatText)}</p>
+      <p>Open your account anytime to see details and, when you're ready, set up weekly lessons.</p>
+      <p><a href="${escapeHtml(magicUrl)}" style="display:inline-block;padding:12px 18px;background:#1b3a5c;color:#fff;text-decoration:none">Open your account</a></p>
+      <p style="font-size:13px;color:#666">Questions? Reply to this email or write <a href="mailto:${escapeHtml(inbox)}">${escapeHtml(inbox)}</a>.</p>
+    `;
+  } else {
+    subject = `Your trial lesson ($${dollars}) — Battery String Studio`;
+    bodyInner = `
+      <h2 style="font-weight:600">You're invited${name ? `, ${escapeHtml(name)}` : ""}</h2>
+      <p>Your <strong>${escapeHtml(String(mins))}-minute trial</strong> is reserved. Pay <strong>$${escapeHtml(dollars)}</strong> to confirm the spot.</p>
+      <p><strong>When:</strong> ${escapeHtml(whenLabel)}<br/>
+      <strong>Format:</strong> ${escapeHtml(formatText)}</p>
+      ${
+        checkoutUrl
+          ? `<p><a href="${escapeHtml(checkoutUrl)}" style="display:inline-block;padding:12px 18px;background:#1b3a5c;color:#fff;text-decoration:none">Pay $${escapeHtml(dollars)} for your trial</a></p>`
+          : ""
+      }
+      <p style="font-size:14px;color:#444">You can also open your account (schedule and next steps):</p>
+      <p><a href="${escapeHtml(magicUrl)}" style="display:inline-block;padding:12px 18px;border:1px solid #1b3a5c;color:#1b3a5c;text-decoration:none">Open your account</a></p>
+      <p style="font-size:13px;color:#666">Questions? Reply or email <a href="mailto:${escapeHtml(inbox)}">${escapeHtml(inbox)}</a>.</p>
+    `;
+  }
+
+  const html = wrap(bodyInner);
+  if (payload) {
+    const logged = await sendAndLogEmail(env, payload, {
+      templateId: waived ? "trial_invite_waived" : "trial_invite",
+      enrollmentId,
+      to: email,
+      toName: name || email,
+      subject,
+      html,
+      replyTo: { email: inbox, name: "Battery String Studio" },
+    });
+    if (!logged.result.ok) {
+      throw Object.assign(
+        new Error(
+          logged.result.skipped
+            ? "BREVO_API_KEY not set — skipped trial invite email"
+            : `Trial invite email failed: ${logged.result.status || ""} ${logged.result.details || ""}`
+        ),
+        { payload: logged.payload, emailRecord: logged.record }
+      );
+    }
+    return { payload: logged.payload, record: logged.record };
+  }
+
+  const result = await sendTransactionalEmail(env, {
+    to: email,
+    toName: name || email,
+    subject,
+    html,
+    replyTo: { email: inbox, name: "Battery String Studio" },
+  });
+  if (!result.ok) {
+    throw new Error(
+      result.skipped
+        ? "BREVO_API_KEY not set — skipped trial invite email"
+        : `Trial invite email failed: ${result.status || ""} ${result.details || ""}`
+    );
+  }
+  return {};
+}
+
+/**
  * Magic-link invite to student billing portal.
  * Pass payload + enrollmentId to persist a send log on the studio store.
  * @returns {{ payload?: object, record?: object }}

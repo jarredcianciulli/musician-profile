@@ -41,10 +41,12 @@ import {
   cancelStudentInvite,
   fetchSubscriptionSlots,
   inviteStudent,
+  inviteTrialStudent,
   resendStudentMagicLink,
   setStudentAmountDue,
   updateLeadStatus,
   type StudentInviteResult,
+  type TrialInviteResult,
 } from "../lib/bookingApi";
 import { nextLessonStartIso } from "../lib/studentSchedule";
 import {
@@ -141,6 +143,18 @@ const Admin: React.FC = () => {
     null
   );
   const [inviteError, setInviteError] = useState("");
+  const [trialName, setTrialName] = useState("");
+  const [trialEmail, setTrialEmail] = useState("");
+  const [trialFormat, setTrialFormat] = useState<LessonFormat>("in_person");
+  const [trialDuration, setTrialDuration] = useState<30 | 45>(30);
+  const [trialCustomLocal, setTrialCustomLocal] = useState("");
+  const [trialAmount, setTrialAmount] = useState("35");
+  const [trialWaive, setTrialWaive] = useState(false);
+  const [trialSubmitting, setTrialSubmitting] = useState(false);
+  const [trialResult, setTrialResult] = useState<TrialInviteResult | null>(
+    null
+  );
+  const [trialError, setTrialError] = useState("");
   const [resendBusyId, setResendBusyId] = useState("");
   const [cancelBusyId, setCancelBusyId] = useState("");
   const [dueDrafts, setDueDrafts] = useState<Record<string, string>>({});
@@ -230,6 +244,80 @@ const Admin: React.FC = () => {
         ? "Saved to API."
         : "Saved locally (browser). Deploy studio-api + set NEXT_PUBLIC_STUDIO_API for production."
     );
+  };
+
+  const sendTrialInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTrialError("");
+    setTrialResult(null);
+    const token = getAdminToken();
+    if (!token) {
+      setTrialError("Re-login required.");
+      return;
+    }
+    if (!trialName.trim() || !trialEmail.trim() || !trialCustomLocal) {
+      setTrialError("Name, email, and lesson date/time are required.");
+      return;
+    }
+    const startDate = new Date(trialCustomLocal);
+    if (Number.isNaN(startDate.getTime())) {
+      setTrialError("Invalid date/time.");
+      return;
+    }
+    const start = startDate.toISOString();
+    const end = new Date(
+      startDate.getTime() + trialDuration * 60 * 1000
+    ).toISOString();
+    const amountDollars = trialWaive ? undefined : Number(trialAmount);
+    if (
+      !trialWaive &&
+      (!Number.isFinite(amountDollars) || (amountDollars as number) < 0)
+    ) {
+      setTrialError("Enter a valid trial price, or check Waive.");
+      return;
+    }
+
+    const ok = await confirm("sendTrialInvite", {
+      name: trialName.trim(),
+      email: trialEmail.trim(),
+      waived: trialWaive,
+      amountLabel: trialWaive ? undefined : `$${trialAmount}`,
+    });
+    if (!ok) return;
+
+    setTrialSubmitting(true);
+    try {
+      const result = await inviteTrialStudent(
+        {
+          name: trialName.trim(),
+          email: trialEmail.trim(),
+          start,
+          end,
+          format: trialFormat,
+          durationMinutes: trialDuration,
+          amountDollars: trialWaive ? undefined : amountDollars,
+          waive: trialWaive,
+        },
+        token
+      );
+      setTrialResult(result);
+      setStatus(result.summary);
+      if (result.enrollment?.id && result.magicUrl) {
+        setPendingMagicUrls((prev) => ({
+          ...prev,
+          [result.enrollment.id]: result.magicUrl,
+        }));
+      }
+      const refreshed = await loadStudio({ includePrivate: true });
+      setPayload(refreshed);
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Could not send trial invite.";
+      setTrialError(msg);
+      setStatus(msg);
+    } finally {
+      setTrialSubmitting(false);
+    }
   };
 
   const sendInvite = async (e: React.FormEvent) => {
@@ -954,10 +1042,178 @@ const Admin: React.FC = () => {
         </section>
         ) : null}
 
+        {/* Trial invite */}
+        {adminTab === "students" ? (
+        <section className="mb-12">
+          <h2 className="font-display text-2xl mb-2">Send trial invite</h2>
+          <p className="text-sm text-muted mb-6 max-w-2xl">
+            Creates a pending account and books a trial time. Set a custom
+            price (Stripe pay link in the email) or waive it for a complimentary
+            trial with different wording.
+          </p>
+          <form
+            onSubmit={sendTrialInvite}
+            className="bg-white border border-line p-5 space-y-4 max-w-xl"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="text-sm block">
+                <span className="text-muted text-xs uppercase tracking-wider">
+                  Name
+                </span>
+                <input
+                  className="admin-input mt-1"
+                  value={trialName}
+                  onChange={(e) => setTrialName(e.target.value)}
+                  required
+                />
+              </label>
+              <label className="text-sm block">
+                <span className="text-muted text-xs uppercase tracking-wider">
+                  Email
+                </span>
+                <input
+                  type="email"
+                  className="admin-input mt-1"
+                  value={trialEmail}
+                  onChange={(e) => setTrialEmail(e.target.value)}
+                  required
+                />
+              </label>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <label className="text-sm block">
+                <span className="text-muted text-xs uppercase tracking-wider">
+                  Length
+                </span>
+                <select
+                  className="admin-input mt-1"
+                  value={trialDuration}
+                  onChange={(e) =>
+                    setTrialDuration(Number(e.target.value) as 30 | 45)
+                  }
+                >
+                  <option value={30}>30 min</option>
+                  <option value={45}>45 min</option>
+                </select>
+              </label>
+              <label className="text-sm block">
+                <span className="text-muted text-xs uppercase tracking-wider">
+                  Format
+                </span>
+                <select
+                  className="admin-input mt-1"
+                  value={trialFormat}
+                  onChange={(e) =>
+                    setTrialFormat(e.target.value as LessonFormat)
+                  }
+                >
+                  <option value="in_person">In person</option>
+                  <option value="online">Online</option>
+                </select>
+              </label>
+              <label className="text-sm block">
+                <span className="text-muted text-xs uppercase tracking-wider">
+                  Trial price ($)
+                </span>
+                <input
+                  className="admin-input mt-1"
+                  inputMode="decimal"
+                  value={trialAmount}
+                  onChange={(e) => setTrialAmount(e.target.value)}
+                  disabled={trialWaive}
+                  placeholder="35"
+                />
+              </label>
+            </div>
+            <label className="text-sm block">
+              <span className="text-muted text-xs uppercase tracking-wider">
+                Trial date &amp; time
+              </span>
+              <input
+                type="datetime-local"
+                className="admin-input mt-1"
+                value={trialCustomLocal}
+                onChange={(e) => setTrialCustomLocal(e.target.value)}
+                required
+              />
+            </label>
+            <label className="flex items-start gap-3 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={trialWaive}
+                onChange={(e) => setTrialWaive(e.target.checked)}
+              />
+              <span>
+                <span className="font-medium">Waive trial fee</span>
+                <span className="block text-muted text-xs mt-0.5">
+                  No Stripe link — email says the lesson is complimentary.
+                </span>
+              </span>
+            </label>
+            {trialError ? (
+              <p className="text-sm text-accent" role="alert">
+                {trialError}
+              </p>
+            ) : null}
+            {trialResult ? (
+              <div className="border border-line bg-paper-muted/40 px-3 py-3 text-sm space-y-2">
+                <p>{trialResult.summary}</p>
+                {trialResult.magicUrl ? (
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      className="admin-input flex-1 text-xs"
+                      readOnly
+                      value={trialResult.magicUrl}
+                    />
+                    <button
+                      type="button"
+                      className="btn-secondary text-xs"
+                      onClick={() => copyText(trialResult.magicUrl)}
+                    >
+                      Copy account link
+                    </button>
+                  </div>
+                ) : null}
+                {trialResult.checkoutUrl ? (
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      className="admin-input flex-1 text-xs"
+                      readOnly
+                      value={trialResult.checkoutUrl}
+                    />
+                    <button
+                      type="button"
+                      className="btn-secondary text-xs"
+                      onClick={() =>
+                        copyText(trialResult.checkoutUrl || "")
+                      }
+                    >
+                      Copy pay link
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={trialSubmitting}
+            >
+              {trialSubmitting
+                ? "Sending…"
+                : trialWaive
+                  ? "Send complimentary trial"
+                  : "Send trial invite"}
+            </button>
+          </form>
+        </section>
+        ) : null}
+
         {/* Invite student */}
         {adminTab === "students" ? (
         <section>
-          <h2 className="font-display text-2xl mb-2">Invite student</h2>
+          <h2 className="font-display text-2xl mb-2">Invite weekly student</h2>
           <p className="text-sm text-muted mb-6">
             Email a magic link to their account. You set billing on the invite;
             they see their schedule and pay (or set up auto-charge).
@@ -1215,12 +1471,24 @@ const Admin: React.FC = () => {
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                         <div>
-                          <p className="font-medium">{enr.name}</p>
+                          <p className="font-medium">
+                            {enr.name}
+                            {enr.inviteKind === "trial" ? (
+                              <span className="ml-2 text-xs uppercase tracking-wider text-sky-deep">
+                                trial
+                                {enr.trialWaived ? " · waived" : ""}
+                              </span>
+                            ) : null}
+                          </p>
                           <p className="text-muted">
                             {enr.email} · {enr.durationMinutes} min ·{" "}
-                            {enr.billingMode === "auto"
-                              ? "auto-charge"
-                              : "pay by link"}
+                            {enr.inviteKind === "trial"
+                              ? enr.trialWaived
+                                ? "complimentary trial"
+                                : "trial (pay link)"
+                              : enr.billingMode === "auto"
+                                ? "auto-charge"
+                                : "pay by link"}
                             {typeof enr.amountDueCents === "number" &&
                             enr.amountDueCents > 0
                               ? ` · due $${(enr.amountDueCents / 100).toFixed(
