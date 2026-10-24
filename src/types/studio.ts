@@ -166,6 +166,8 @@ export type StudentEnrollment = {
   stripeSubscriptionId?: string;
   /** How far ahead the portal shows lessons (months). Default 12. */
   scheduleMonths?: number;
+  /** ISO timestamp when student agreed to studio policy (portal or subscribe). */
+  policyAcceptedAt?: string;
   createdAt?: string;
 };
 

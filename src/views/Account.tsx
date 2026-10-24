@@ -25,6 +25,11 @@ import {
 } from "../lib/accountScheduleFilters";
 import { formatSlotDay, formatSlotTime } from "../lib/slots";
 import { marketingSiteUrl, studioEmail } from "../lib/env";
+import { collectReturnQuery } from "../lib/returnQuery";
+import {
+  STUDIO_POLICY_SECTIONS,
+  STUDIO_POLICY_TITLE,
+} from "../content/studioPolicy";
 
 const SCHEDULE_COLLAPSE_KEY = "bss_account_schedule_open";
 
@@ -74,6 +79,7 @@ const Account: React.FC = () => {
   const [scheduleOpen, setScheduleOpen] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [policyChecked, setPolicyChecked] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const paidBanner = searchParams.get("paid") === "1";
   const canceledBanner = searchParams.get("canceled") === "1";
@@ -246,10 +252,18 @@ const Account: React.FC = () => {
   };
 
   const onCheckout = async (mode: "auto" | "manual") => {
+    const alreadyAccepted = Boolean(data?.enrollment?.policyAcceptedAt);
+    if (!alreadyAccepted && !policyChecked) {
+      setError("Please agree to the studio policy before continuing.");
+      return;
+    }
     setCheckoutBusy(mode);
     setError("");
     try {
-      const { url } = await startAccountCheckout(mode);
+      const { url } = await startAccountCheckout(mode, {
+        policyAccepted: alreadyAccepted || policyChecked,
+        returnQuery: collectReturnQuery(searchParams),
+      });
       window.location.href = url;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed.");
@@ -432,6 +446,16 @@ const Account: React.FC = () => {
                 onClick={() => setMenuOpen(false)}
               >
                 Contact
+              </a>
+              <a
+                role="menuitem"
+                className="block px-4 py-2.5 hover:bg-paper-muted text-ink"
+                href={`${marketingSiteUrl()}/policy`}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => setMenuOpen(false)}
+              >
+                Studio policy
               </a>
               <button
                 type="button"
@@ -785,73 +809,129 @@ const Account: React.FC = () => {
 
       <section className="mb-10">
         <h2 className="font-display text-2xl mb-2">Billing</h2>
-        {autoReady ? (
-          <div className="border border-line bg-white px-4 py-4 text-sm space-y-1 mb-4">
-            <p className="font-medium">Auto-charge monthly</p>
-            <p className="text-ink-soft">
-              Card on file
-              {enrollment.nextDueAt
-                ? ` · renews around ${formatSlotDay(enrollment.nextDueAt, TZ)}`
-                : ""}
-            </p>
-          </div>
-        ) : showAutoSetup ? (
-          <div className="border border-line bg-white px-4 py-4 text-sm space-y-3 mb-4">
-            <p className="font-medium">Set up monthly auto-charge</p>
-            <p className="text-ink-soft">
-              First period: {formatMoney(due)} (proration if mid-month), then
-              monthly tuition on your card.
-            </p>
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={Boolean(checkoutBusy)}
-              onClick={() => onCheckout("auto")}
-            >
-              {checkoutBusy === "auto" ? "Redirecting…" : "Continue to Stripe"}
-            </button>
-          </div>
-        ) : (
-          <div className="border border-line bg-white px-4 py-4 text-sm space-y-3 mb-4">
-            {showChoice ? (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  className="btn-primary"
-                  disabled={Boolean(checkoutBusy)}
-                  onClick={() => onCheckout("auto")}
-                >
-                  {checkoutBusy === "auto"
-                    ? "Redirecting…"
-                    : "Auto-charge monthly"}
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  disabled={Boolean(checkoutBusy) || due <= 0}
-                  onClick={() => onCheckout("manual")}
-                >
-                  {checkoutBusy === "manual"
-                    ? "Redirecting…"
-                    : `Pay ${formatMoney(due)} this period`}
-                </button>
-              </div>
-            ) : showManualPay && due > 0 ? (
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={Boolean(checkoutBusy)}
-                onClick={() => onCheckout("manual")}
-              >
-                {checkoutBusy === "manual"
-                  ? "Redirecting…"
-                  : `Pay ${formatMoney(due)} due now`}
-              </button>
-            ) : (
-              <p className="text-muted">You&apos;re paid up for this period.</p>
-            )}
-          </div>
-        )}
+        {(() => {
+          const policyDone = Boolean(enrollment.policyAcceptedAt);
+          const needsCheckout =
+            !autoReady &&
+            (showAutoSetup || showChoice || (showManualPay && due > 0));
+          const canCheckout = policyDone || policyChecked;
+          return (
+            <>
+              {needsCheckout && !policyDone ? (
+                <div className="border border-line bg-white px-4 py-4 text-sm space-y-3 mb-4">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <h3 className="font-account text-lg text-ink">
+                      {STUDIO_POLICY_TITLE}
+                    </h3>
+                    <a
+                      href={`${marketingSiteUrl()}/policy`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-sky-deep underline underline-offset-2 shrink-0"
+                    >
+                      Full page
+                    </a>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto border border-line bg-paper px-3 py-3 space-y-3 text-ink-soft">
+                    {STUDIO_POLICY_SECTIONS.map((s) => (
+                      <div key={s.heading}>
+                        <p className="font-semibold text-ink">{s.heading}</p>
+                        <p className="mt-1 leading-relaxed">{s.body}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={policyChecked}
+                      onChange={(e) => setPolicyChecked(e.target.checked)}
+                    />
+                    <span>
+                      I have read and agree to the studio policy, including that
+                      my tuition reserves this weekly time whether or not I
+                      attend.
+                    </span>
+                  </label>
+                </div>
+              ) : null}
+
+              {autoReady ? (
+                <div className="border border-line bg-white px-4 py-4 text-sm space-y-1 mb-4">
+                  <p className="font-medium">Auto-charge monthly</p>
+                  <p className="text-ink-soft">
+                    Card on file
+                    {enrollment.nextDueAt
+                      ? ` · renews around ${formatSlotDay(enrollment.nextDueAt, TZ)}`
+                      : ""}
+                  </p>
+                </div>
+              ) : showAutoSetup ? (
+                <div className="border border-line bg-white px-4 py-4 text-sm space-y-3 mb-4">
+                  <p className="font-medium">Set up monthly auto-charge</p>
+                  <p className="text-ink-soft">
+                    First period: {formatMoney(due)} (proration if mid-month),
+                    then monthly tuition on your card.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={Boolean(checkoutBusy) || !canCheckout}
+                    onClick={() => onCheckout("auto")}
+                  >
+                    {checkoutBusy === "auto"
+                      ? "Redirecting…"
+                      : "Continue to Stripe"}
+                  </button>
+                </div>
+              ) : (
+                <div className="border border-line bg-white px-4 py-4 text-sm space-y-3 mb-4">
+                  {showChoice ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        disabled={Boolean(checkoutBusy) || !canCheckout}
+                        onClick={() => onCheckout("auto")}
+                      >
+                        {checkoutBusy === "auto"
+                          ? "Redirecting…"
+                          : "Auto-charge monthly"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        disabled={
+                          Boolean(checkoutBusy) || due <= 0 || !canCheckout
+                        }
+                        onClick={() => onCheckout("manual")}
+                      >
+                        {checkoutBusy === "manual"
+                          ? "Redirecting…"
+                          : `Pay ${formatMoney(due)} this period`}
+                      </button>
+                    </div>
+                  ) : showManualPay && due > 0 ? (
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={Boolean(checkoutBusy) || !canCheckout}
+                      onClick={() => onCheckout("manual")}
+                    >
+                      {checkoutBusy === "manual"
+                        ? "Redirecting…"
+                        : `Pay ${formatMoney(due)} due now`}
+                    </button>
+                  ) : (
+                    <p className="text-muted">
+                      You&apos;re paid up for this period.
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {billingRows.length > 0 ? (
           <div className="border border-line bg-white overflow-x-auto">

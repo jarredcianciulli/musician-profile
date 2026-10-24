@@ -242,6 +242,7 @@ export async function startSubscriptionCheckout(input: {
   format?: LessonFormat;
   policyAccepted: boolean;
   notes?: string;
+  returnQuery?: Record<string, string>;
 }): Promise<{ url: string; proration: ProrationResult; reservationId?: string }> {
   if (!apiBase) {
     throw new Error("Subscription checkout requires the studio API.");
@@ -369,7 +370,11 @@ export async function fetchAccountMe(): Promise<AccountPortalData> {
 }
 
 export async function startAccountCheckout(
-  mode: "auto" | "manual"
+  mode: "auto" | "manual",
+  opts?: {
+    policyAccepted?: boolean;
+    returnQuery?: Record<string, string>;
+  }
 ): Promise<{ url: string }> {
   if (!apiBase) throw new Error("Account portal requires the studio API.");
   const token = getAccountSessionToken();
@@ -380,7 +385,11 @@ export async function startAccountCheckout(
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ mode }),
+    body: JSON.stringify({
+      mode,
+      policyAccepted: opts?.policyAccepted,
+      returnQuery: opts?.returnQuery,
+    }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {

@@ -10,6 +10,7 @@ import {
   persistReservationId,
   startSubscriptionCheckout,
 } from "@/lib/bookingApi";
+import { collectReturnQuery } from "@/lib/returnQuery";
 import { analytics } from "@/utils/analytics";
 import {
   DEFAULT_SUBSCRIPTION_MINUTES,
@@ -200,6 +201,9 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
         end: selectedSlot.end,
         format,
         policyAccepted: true,
+        returnQuery: collectReturnQuery(
+          typeof window !== "undefined" ? window.location.search : ""
+        ),
       });
       if (result.reservationId) {
         persistReservationId(result.reservationId);

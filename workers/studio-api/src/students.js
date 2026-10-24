@@ -278,6 +278,7 @@ export function publicEnrollment(enrollment) {
     nextDueAt: enrollment.nextDueAt || null,
     stripeSubscriptionId: enrollment.stripeSubscriptionId || "",
     scheduleMonths: enrollment.scheduleMonths || 12,
+    policyAcceptedAt: enrollment.policyAcceptedAt || "",
     createdAt: enrollment.createdAt,
   };
 }

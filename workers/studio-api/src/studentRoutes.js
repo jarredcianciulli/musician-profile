@@ -22,6 +22,7 @@ import {
   periodKeyFromDate,
   nextMonthStartIso,
 } from "./students.js";
+import { appendReturnQuery, sanitizeReturnQuery } from "./returnQuery.js";
 
 function newId(prefix) {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -376,6 +377,23 @@ export async function handleStudentRoutes({
       return json({ error: "Invalid JSON" }, 400, origin);
     }
     const mode = body?.mode === "auto" ? "auto" : "manual";
+    const returnQuery = sanitizeReturnQuery(body?.returnQuery);
+
+    if (!enrollment.policyAcceptedAt) {
+      if (!body?.policyAccepted) {
+        return json(
+          { error: "Please agree to the studio policy before continuing." },
+          400,
+          origin
+        );
+      }
+      enrollment = {
+        ...enrollment,
+        policyAcceptedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      payload = updateEnrollment(payload, enrollment);
+    }
 
     enrollment = refreshEnrollmentDue(
       enrollment,
@@ -384,11 +402,14 @@ export async function handleStudentRoutes({
     const prorationHint = enrollment._proration;
     delete enrollment._proration;
 
-    const successUrl = accountPath(
-      env,
-      "?paid=1&session_id={CHECKOUT_SESSION_ID}"
+    const successUrl = appendReturnQuery(
+      accountPath(env, "?paid=1&session_id={CHECKOUT_SESSION_ID}"),
+      returnQuery
     );
-    const cancelUrl = accountPath(env, "?canceled=1");
+    const cancelUrl = appendReturnQuery(
+      accountPath(env, "?canceled=1"),
+      returnQuery
+    );
     const mins = enrollment.durationMinutes;
     const priceId = env[`STRIPE_PRICE_${mins}`] || "";
 
@@ -435,6 +456,7 @@ export async function handleStudentRoutes({
             billingMode: "auto",
             periodKey: periodKeyFromDate(),
             remainingLessons: String(proration.remainingLessons),
+            policyAcceptedAt: enrollment.policyAcceptedAt || "",
           },
         });
 

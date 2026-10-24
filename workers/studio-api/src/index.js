@@ -25,6 +25,7 @@ import {
   handleStudentRoutes,
   confirmEnrollmentFromSession,
 } from "./studentRoutes.js";
+import { appendReturnQuery, sanitizeReturnQuery } from "./returnQuery.js";
 
 const STORE_KEY = "studio_payload_v2";
 const HOLD_TTL_MS = 20 * 60 * 1000;
@@ -1297,7 +1298,9 @@ export default {
         format,
         policyAccepted,
         notes,
+        returnQuery: returnQueryRaw,
       } = body || {};
+      const returnQuery = sanitizeReturnQuery(returnQueryRaw);
       const mins = Number(durationMinutes);
       if (!name?.trim() || !email?.trim() || ![30, 45, 60].includes(mins)) {
         return json(
@@ -1406,8 +1409,14 @@ export default {
           monthlyRateCents: proration.monthlyRateCents,
           prorateCents: proration.prorateCents,
           priceId: priceId || undefined,
-          successUrl: `${base}/subscribe/success?session_id={CHECKOUT_SESSION_ID}`,
-          cancelUrl: `${base}/?canceled_sub=1&rid=${reservationId}#lessons`,
+          successUrl: appendReturnQuery(
+            `${base}/subscribe/success?session_id={CHECKOUT_SESSION_ID}`,
+            returnQuery
+          ),
+          cancelUrl: appendReturnQuery(
+            `${base}/?canceled_sub=1&rid=${reservationId}#lessons`,
+            returnQuery
+          ),
           billingCycleAnchor: proration.billingCycleAnchor,
           metadata: {
             type: "subscription",
