@@ -276,6 +276,8 @@ export async function createAdminSubscriptionCheckout(
     end: string;
     format?: LessonFormat;
     billingMode: "auto" | "manual";
+    /** Skip open-slot check (past / custom weekly times). Default true on server for admin. */
+    allowPast?: boolean;
   },
   adminToken: string
 ): Promise<AdminCheckoutResult> {

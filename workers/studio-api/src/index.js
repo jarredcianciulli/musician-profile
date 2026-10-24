@@ -1454,6 +1454,8 @@ export default {
       const format = body?.format || "in_person";
       const billingMode =
         body?.billingMode === "manual" ? "manual" : "auto";
+      /** Admin may set a past/custom weekly time (skip calendar open-slot check). */
+      const allowPast = body?.allowPast !== false;
       if (!name || !email || !start || !end) {
         return json(
           { error: "name, email, start, and end are required." },
@@ -1471,14 +1473,24 @@ export default {
         return json({ error: "Stripe is not configured." }, 503, origin);
       }
 
-      const payload = await readPayload(env);
-      try {
-        await assertSlotOpen(env, payload, start, end, mins);
-      } catch (error) {
-        return json({ error: error.message }, 409, origin);
+      const startDate = new Date(start);
+      const endDate = new Date(end);
+      if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+        return json({ error: "Invalid start or end datetime." }, 400, origin);
+      }
+      if (endDate.getTime() <= startDate.getTime()) {
+        return json({ error: "end must be after start." }, 400, origin);
       }
 
-      const startDate = new Date(start);
+      const payload = await readPayload(env);
+      if (!allowPast) {
+        try {
+          await assertSlotOpen(env, payload, start, end, mins);
+        } catch (error) {
+          return json({ error: error.message }, 409, origin);
+        }
+      }
+
       const tz = payload.availability.timezone || "America/New_York";
       const preferredWeekday = weekdayFromDate(startDate, tz);
       if (preferredWeekday == null) {
@@ -1489,13 +1501,18 @@ export default {
         );
       }
 
+      // Past weekly anchor: count remaining lessons from now (include today).
+      const startInPast = startDate.getTime() < Date.now();
+      const prorationFrom = startInPast ? new Date() : startDate;
+
       let proration;
       try {
         proration = computeProration({
           durationMinutes: mins,
           preferredWeekday,
-          startDate,
+          startDate: prorationFrom,
           weeklyHours: payload.availability?.weeklyHours,
+          includeToday: startInPast || allowPast,
         });
       } catch (error) {
         return json({ error: error.message }, 400, origin);

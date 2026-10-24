@@ -96,6 +96,8 @@ const Admin: React.FC = () => {
     { start: string; end: string; label: string }[]
   >([]);
   const [paySlotStart, setPaySlotStart] = useState("");
+  const [payUseCustomTime, setPayUseCustomTime] = useState(true);
+  const [payCustomLocal, setPayCustomLocal] = useState("");
   const [payLoadingSlots, setPayLoadingSlots] = useState(false);
   const [paySubmitting, setPaySubmitting] = useState(false);
   const [payResult, setPayResult] = useState<AdminCheckoutResult | null>(null);
@@ -179,15 +181,37 @@ const Admin: React.FC = () => {
       setPayError("Re-login required.");
       return;
     }
-    const slot = paySlots.find((s) => s.start === paySlotStart);
-    if (!slot) {
-      setPayError("Pick an open weekly time.");
-      return;
-    }
     if (!payName.trim() || !payEmail.trim()) {
       setPayError("Name and email are required.");
       return;
     }
+
+    let start = "";
+    let end = "";
+    if (payUseCustomTime) {
+      if (!payCustomLocal) {
+        setPayError("Enter the weekly lesson date and time.");
+        return;
+      }
+      const startDate = new Date(payCustomLocal);
+      if (Number.isNaN(startDate.getTime())) {
+        setPayError("Invalid date/time.");
+        return;
+      }
+      start = startDate.toISOString();
+      end = new Date(
+        startDate.getTime() + payDuration * 60 * 1000
+      ).toISOString();
+    } else {
+      const slot = paySlots.find((s) => s.start === paySlotStart);
+      if (!slot) {
+        setPayError("Pick an open weekly time.");
+        return;
+      }
+      start = slot.start;
+      end = slot.end;
+    }
+
     setPaySubmitting(true);
     try {
       const result = await createAdminSubscriptionCheckout(
@@ -195,10 +219,11 @@ const Admin: React.FC = () => {
           name: payName.trim(),
           email: payEmail.trim(),
           durationMinutes: payDuration,
-          start: slot.start,
-          end: slot.end,
+          start,
+          end,
           format: payFormat,
           billingMode: payBilling,
+          allowPast: true,
         },
         token
       );
@@ -728,30 +753,66 @@ const Admin: React.FC = () => {
                 </select>
               </label>
             </div>
-            <label className="text-sm block">
-              <span className="text-muted text-xs uppercase tracking-wider">
-                First / weekly time
-              </span>
-              <select
-                className="admin-input mt-1"
-                value={paySlotStart}
-                onChange={(e) => setPaySlotStart(e.target.value)}
-                disabled={payLoadingSlots || paySlots.length === 0}
-                required
-              >
-                {payLoadingSlots ? (
-                  <option value="">Loading times…</option>
-                ) : paySlots.length === 0 ? (
-                  <option value="">No open slots</option>
-                ) : (
-                  paySlots.map((s) => (
-                    <option key={s.start} value={s.start}>
-                      {s.label}
-                    </option>
-                  ))
-                )}
-              </select>
-            </label>
+            <fieldset className="space-y-3">
+              <legend className="text-muted text-xs uppercase tracking-wider">
+                Weekly lesson time
+              </legend>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  checked={payUseCustomTime}
+                  onChange={() => setPayUseCustomTime(true)}
+                />
+                Custom date/time (past OK — sets weekday + time)
+              </label>
+              {payUseCustomTime ? (
+                <label className="text-sm block">
+                  <span className="text-muted text-xs uppercase tracking-wider">
+                    First lesson (local time)
+                  </span>
+                  <input
+                    type="datetime-local"
+                    className="admin-input mt-1"
+                    value={payCustomLocal}
+                    onChange={(e) => setPayCustomLocal(e.target.value)}
+                    required={payUseCustomTime}
+                  />
+                  <span className="block text-xs text-muted mt-1">
+                    Example: today&apos;s Friday time even if it already
+                    started. Proration counts remaining Fridays from now.
+                  </span>
+                </label>
+              ) : null}
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  checked={!payUseCustomTime}
+                  onChange={() => setPayUseCustomTime(false)}
+                />
+                Pick from open future slots
+              </label>
+              {!payUseCustomTime ? (
+                <select
+                  className="admin-input"
+                  value={paySlotStart}
+                  onChange={(e) => setPaySlotStart(e.target.value)}
+                  disabled={payLoadingSlots || paySlots.length === 0}
+                  required={!payUseCustomTime}
+                >
+                  {payLoadingSlots ? (
+                    <option value="">Loading times…</option>
+                  ) : paySlots.length === 0 ? (
+                    <option value="">No open slots</option>
+                  ) : (
+                    paySlots.map((s) => (
+                      <option key={s.start} value={s.start}>
+                        {s.label}
+                      </option>
+                    ))
+                  )}
+                </select>
+              ) : null}
+            </fieldset>
             {payError ? (
               <p className="text-sm text-accent" role="alert">
                 {payError}
@@ -760,7 +821,10 @@ const Admin: React.FC = () => {
             <button
               type="submit"
               className="btn-primary"
-              disabled={paySubmitting || !paySlotStart}
+              disabled={
+                paySubmitting ||
+                (payUseCustomTime ? !payCustomLocal : !paySlotStart)
+              }
             >
               {paySubmitting ? "Creating…" : "Create payment link"}
             </button>

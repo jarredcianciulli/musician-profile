@@ -54,7 +54,8 @@ function countWeekdayOccurrences(
   from,
   toExclusive,
   preferredWeekday,
-  weeklyHours
+  weeklyHours,
+  includeToday = false
 ) {
   const start = zonedParts(from);
   const end = zonedParts(toExclusive);
@@ -83,6 +84,7 @@ function countWeekdayOccurrences(
         p.month === start.month &&
         p.day === start.day;
       const stillOpen =
+        includeToday ||
         !isToday ||
         start.hour < endH ||
         (start.hour === endH && start.minute === 0);
@@ -121,6 +123,8 @@ export function computeProration({
   preferredWeekday,
   startDate = new Date(),
   weeklyHours,
+  /** When true, count today's weekday even if the teaching window already ended. */
+  includeToday = false,
 }) {
   const rate = RATES[durationMinutes];
   if (!rate) {
@@ -139,7 +143,8 @@ export function computeProration({
     start,
     nextMonth,
     wd,
-    weeklyHours
+    weeklyHours,
+    includeToday
   );
   const lessonCents = PER_LESSON_CENTS[durationMinutes];
   const prorateCents = remainingLessons * lessonCents;
