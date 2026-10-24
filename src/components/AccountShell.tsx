@@ -14,16 +14,18 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
             <p className="text-[10px] uppercase tracking-[0.16em] text-muted">
               Student account
             </p>
-            <p className="font-display text-lg leading-tight truncate">
+            <p className="font-account text-lg leading-tight truncate font-semibold tracking-tight">
               Battery String Studio
             </p>
           </div>
         </div>
       </header>
-      <main className="flex-grow">{children}</main>
+      <main className="flex-grow [&_.font-display]:font-account">
+        {children}
+      </main>
       <footer className="border-t border-line py-6">
         <div className="section-container text-xs text-muted">
-          Questions? Reply to your invite email or use Menu → Studio website.
+          Questions? Use Menu → Contact, or reply to your invite email.
         </div>
       </footer>
     </div>

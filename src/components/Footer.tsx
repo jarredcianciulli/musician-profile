@@ -63,7 +63,7 @@ const Footer: React.FC = () => {
           </div>
 
           <div>
-            <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
+            <h3 className="font-display text-xl mb-4">Menu</h3>
             <ul className="space-y-2 text-paper/60">
               {[
                 ["home", "Home"],
@@ -74,22 +74,61 @@ const Footer: React.FC = () => {
               ].map(([id, label]) => (
                 <li key={id}>
                   <a
-                    href={`#${id}`}
+                    href={`/#${id}`}
                     className="hover:text-gold transition-colors cursor-pointer inline-block"
-                    onClick={(e) => handleSmoothScroll(e as any, id)}
+                    onClick={(e) => handleSmoothScroll(e, id)}
                   >
                     {label}
                   </a>
                 </li>
               ))}
+              <li>
+                <a
+                  href="/account"
+                  className="hover:text-gold transition-colors"
+                >
+                  Student account
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/trial"
+                  className="hover:text-gold transition-colors"
+                >
+                  Book a trial
+                </a>
+              </li>
             </ul>
           </div>
 
           <div>
-            <h3 className="text-lg font-semibold mb-4">Contact</h3>
+            <h3 className="font-display text-xl mb-4">Contact</h3>
             <ul className="space-y-2 text-paper/60">
-              <li>Email: {contactInfo.email}</li>
-              <li>Phone: {contactInfo.phone}</li>
+              <li>
+                <a
+                  href="/#contact"
+                  className="hover:text-gold transition-colors"
+                  onClick={(e) => handleSmoothScroll(e, "contact")}
+                >
+                  Message form
+                </a>
+              </li>
+              <li>
+                <a
+                  href={`mailto:${contactInfo.email}`}
+                  className="hover:text-gold transition-colors"
+                >
+                  {contactInfo.email}
+                </a>
+              </li>
+              <li>
+                <a
+                  href={`tel:${contactInfo.phone.replace(/\D/g, "")}`}
+                  className="hover:text-gold transition-colors"
+                >
+                  {contactInfo.phone}
+                </a>
+              </li>
               <li>
                 {contactInfo.city}, {contactInfo.state}
               </li>

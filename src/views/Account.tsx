@@ -45,6 +45,8 @@ function statusLabel(status: string) {
       return "Scheduled";
     case "scheduled":
       return "Scheduled";
+    case "completed":
+      return "Completed";
     case "holiday":
       return "Holiday";
     case "break":
@@ -420,6 +422,16 @@ const Account: React.FC = () => {
                 onClick={() => setMenuOpen(false)}
               >
                 Studio website
+              </a>
+              <a
+                role="menuitem"
+                className="block px-4 py-2.5 hover:bg-paper-muted text-ink"
+                href={`${marketingSiteUrl()}/#contact`}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => setMenuOpen(false)}
+              >
+                Contact
               </a>
               <button
                 type="button"

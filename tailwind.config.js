@@ -49,6 +49,7 @@ module.exports = {
       fontFamily: {
         sans: ["Source Sans 3", "system-ui", "sans-serif"],
         display: ["Cormorant Garamond", "Georgia", "serif"],
+        account: ["Fraunces", "Cormorant Garamond", "Georgia", "serif"],
       },
     },
   },

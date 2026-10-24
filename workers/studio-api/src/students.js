@@ -122,9 +122,15 @@ export function buildSchedule(enrollment, holidays = [], months) {
   const weekday = WEEKDAY_LABEL[slotParts.weekday];
   const durationMs = (enrollment.durationMinutes || 45) * 60 * 1000;
   const out = [];
-  const cursor = new Date();
-  const endMs = cursor.getTime() + horizonMonths * 31 * 24 * 60 * 60 * 1000;
-  const maxDays = horizonMonths * 32 + 14;
+  // Start from the enrolled first lesson so prorated / past first dates still show
+  const firstLessonMs = new Date(enrollment.slotStart).getTime();
+  const walkFromMs = Number.isFinite(firstLessonMs)
+    ? Math.min(firstLessonMs, Date.now())
+    : Date.now();
+  const cursor = new Date(walkFromMs);
+  const endMs = Date.now() + horizonMonths * 31 * 24 * 60 * 60 * 1000;
+  const maxDays = horizonMonths * 32 + 21;
+  const fourteenDaysAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
 
   for (let i = 0; i < maxDays; i++) {
     const probe = new Date(cursor.getTime() + i * 24 * 60 * 60 * 1000);
@@ -133,7 +139,16 @@ export function buildSchedule(enrollment, holidays = [], months) {
     if (WEEKDAY_LABEL[p.weekday] !== weekday) continue;
 
     const start = slotOnDay(p.year, p.month, p.day, slotParts);
-    if (start.getTime() + durationMs < Date.now() - 60 * 60 * 1000) continue;
+    // Never list before the enrolled first lesson
+    if (start.getTime() < firstLessonMs - 60 * 60 * 1000) continue;
+
+    const ended = start.getTime() + durationMs < Date.now();
+    if (ended) {
+      // Keep first-lesson week + recent past; drop older history
+      const nearFirst =
+        Math.abs(start.getTime() - firstLessonMs) < 8 * 24 * 60 * 60 * 1000;
+      if (!nearFirst && start.getTime() < fourteenDaysAgo) continue;
+    }
 
     const covering = holidayCovering(start.toISOString(), holidays, tz);
     if (covering) {
@@ -156,7 +171,7 @@ export function buildSchedule(enrollment, holidays = [], months) {
       start: start.toISOString(),
       end: new Date(start.getTime() + durationMs).toISOString(),
       title: "Lesson",
-      status: "scheduled",
+      status: ended ? "completed" : "scheduled",
     });
   }
   return out;

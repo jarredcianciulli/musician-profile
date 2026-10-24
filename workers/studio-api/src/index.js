@@ -1810,7 +1810,9 @@ export default {
         : "";
       const sourceRaw = String(body?.source || "lead_form").trim();
       const source =
-        sourceRaw === "flyer" || sourceRaw === "lead_form"
+        sourceRaw === "flyer" ||
+        sourceRaw === "lead_form" ||
+        sourceRaw === "contact_form"
           ? sourceRaw
           : "lead_form";
 
@@ -1828,7 +1830,7 @@ export default {
           ? String(body.utmCampaign).slice(0, 80)
           : undefined,
         path: body?.path ? String(body.path).slice(0, 200) : undefined,
-        notes: body?.notes ? String(body.notes).slice(0, 500) : undefined,
+        notes: body?.notes ? String(body.notes).slice(0, 2000) : undefined,
       };
       const leads = upsertLead(payload.leads, lead);
       const saved =

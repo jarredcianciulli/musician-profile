@@ -207,19 +207,22 @@ export async function sendLeadEmails(env, lead) {
   const email = lead.email || "";
   const phone = lead.phone || "";
 
+  const fromContact = lead.source === "contact_form";
   const studio = await sendTransactionalEmail(env, {
     to: inbox,
     toName: "Battery String Studio",
-    subject: `New lead — ${name}`,
+    subject: fromContact
+      ? `Website contact — ${name}`
+      : `New lead — ${name}`,
     html: wrap(`
-      <h2 style="font-weight:600">New lead</h2>
+      <h2 style="font-weight:600">${fromContact ? "Website contact" : "New lead"}</h2>
       <p><strong>Name:</strong> ${escapeHtml(name)}</p>
       <p><strong>Email:</strong> ${escapeHtml(email || "—")}</p>
       <p><strong>Phone:</strong> ${escapeHtml(phone || "—")}</p>
       <p><strong>Source:</strong> ${escapeHtml(lead.source || "lead_form")}</p>
       ${lead.flyer ? `<p><strong>Flyer:</strong> ${escapeHtml(lead.flyer)}</p>` : ""}
       ${lead.utmSource || lead.utmCampaign ? `<p><strong>UTM:</strong> ${escapeHtml([lead.utmSource, lead.utmMedium, lead.utmCampaign].filter(Boolean).join(" / "))}</p>` : ""}
-      ${lead.notes ? `<p><strong>Notes:</strong> ${escapeHtml(lead.notes)}</p>` : ""}
+      ${lead.notes ? `<p><strong>${fromContact ? "Message" : "Notes"}:</strong> ${escapeHtml(lead.notes)}</p>` : ""}
       <p><a href="${siteBase(env)}/admin">Open admin</a></p>
     `),
     replyTo: email ? { email, name } : undefined,

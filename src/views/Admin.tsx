@@ -118,6 +118,9 @@ const Admin: React.FC = () => {
   );
   const [inviteError, setInviteError] = useState("");
   const [resendBusyId, setResendBusyId] = useState("");
+  const [pendingMagicUrls, setPendingMagicUrls] = useState<
+    Record<string, string>
+  >({});
   const [adminTab, setAdminTab] = useState<AdminTab>("students");
 
   useEffect(() => {
@@ -246,6 +249,12 @@ const Admin: React.FC = () => {
       );
       setInviteResult(result);
       setStatus(result.summary);
+      if (result.enrollment?.id && result.magicUrl) {
+        setPendingMagicUrls((prev) => ({
+          ...prev,
+          [result.enrollment.id]: result.magicUrl,
+        }));
+      }
       const refreshed = await loadStudio({ includePrivate: true });
       setPayload(refreshed);
     } catch (err) {
@@ -277,11 +286,15 @@ const Admin: React.FC = () => {
     try {
       const result = await resendStudentMagicLink(enrollmentId, token);
       if (result.magicUrl) {
+        setPendingMagicUrls((prev) => ({
+          ...prev,
+          [enrollmentId]: result.magicUrl,
+        }));
         try {
           await navigator.clipboard.writeText(result.magicUrl);
           setStatus("Magic link resent and copied.");
         } catch {
-          setStatus("Magic link resent.");
+          setStatus("Magic link resent — copy from the field below.");
         }
       } else {
         setStatus("Magic link resent.");
@@ -981,37 +994,68 @@ const Admin: React.FC = () => {
                   .map((enr) => (
                     <li
                       key={enr.id}
-                      className="bg-white border border-line px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm"
+                      className="bg-white border border-line px-4 py-3 space-y-3 text-sm"
                     >
-                      <div>
-                        <p className="font-medium">{enr.name}</p>
-                        <p className="text-muted">
-                          {enr.email} · {enr.durationMinutes} min ·{" "}
-                          {enr.billingMode === "auto"
-                            ? "auto-charge"
-                            : "pay by link"}
-                          {typeof enr.amountDueCents === "number" &&
-                          enr.amountDueCents > 0
-                            ? ` · due $${(enr.amountDueCents / 100).toFixed(
-                                enr.amountDueCents % 100 === 0 ? 0 : 2
-                              )}`
-                            : ""}
-                        </p>
-                        <p className="text-xs text-muted mt-0.5">
-                          {formatSlotDay(enr.slotStart, tz)} ·{" "}
-                          {formatSlotTime(enr.slotStart, tz)} · {enr.status}
-                        </p>
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div>
+                          <p className="font-medium">{enr.name}</p>
+                          <p className="text-muted">
+                            {enr.email} · {enr.durationMinutes} min ·{" "}
+                            {enr.billingMode === "auto"
+                              ? "auto-charge"
+                              : "pay by link"}
+                            {typeof enr.amountDueCents === "number" &&
+                            enr.amountDueCents > 0
+                              ? ` · due $${(enr.amountDueCents / 100).toFixed(
+                                  enr.amountDueCents % 100 === 0 ? 0 : 2
+                                )}`
+                              : ""}
+                          </p>
+                          <p className="text-xs text-muted mt-0.5">
+                            {formatSlotDay(enr.slotStart, tz)} ·{" "}
+                            {formatSlotTime(enr.slotStart, tz)} · {enr.status}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-primary shrink-0 text-xs"
+                          disabled={resendBusyId === enr.id}
+                          onClick={() => resendInvite(enr.id)}
+                        >
+                          {resendBusyId === enr.id
+                            ? "Sending…"
+                            : pendingMagicUrls[enr.id]
+                              ? "Resend new link"
+                              : "Generate / resend link"}
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        className="btn-primary shrink-0 text-xs"
-                        disabled={resendBusyId === enr.id}
-                        onClick={() => resendInvite(enr.id)}
-                      >
-                        {resendBusyId === enr.id
-                          ? "Sending…"
-                          : "Resend magic link"}
-                      </button>
+                      {pendingMagicUrls[enr.id] ? (
+                        <div>
+                          <p className="text-xs uppercase tracking-wider text-muted mb-1">
+                            Magic link (copyable)
+                          </p>
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <input
+                              className="admin-input flex-1 text-xs"
+                              readOnly
+                              value={pendingMagicUrls[enr.id]}
+                            />
+                            <button
+                              type="button"
+                              className="btn-secondary shrink-0 text-xs"
+                              onClick={() =>
+                                copyText(pendingMagicUrls[enr.id])
+                              }
+                            >
+                              Copy
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted">
+                          Resend to email a link and show it here for copying.
+                        </p>
+                      )}
                     </li>
                   ))}
               </ul>
