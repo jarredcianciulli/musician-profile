@@ -90,6 +90,8 @@ export async function handleStudentRoutes({
     const start = String(body?.start || "").trim();
     const end = String(body?.end || "").trim();
     const format = body?.format || "in_person";
+    const billingMode =
+      body?.billingMode === "auto" ? "auto" : "manual";
     if (!name || !email || !start || !end) {
       return json(
         { error: "name, email, start, and end are required." },
@@ -123,6 +125,11 @@ export async function handleStudentRoutes({
           durationMinutes: mins,
           format,
           weekday,
+          // Don't demote an active Stripe subscription to manual via re-invite
+          billingMode:
+            existing.billingMode === "auto" && existing.stripeSubscriptionId
+              ? "auto"
+              : billingMode,
           status: existing.status === "active" ? "active" : "invited",
           updatedAt: new Date().toISOString(),
         }
@@ -136,7 +143,7 @@ export async function handleStudentRoutes({
           format,
           weekday,
           status: "invited",
-          billingMode: "unset",
+          billingMode,
           amountDueCents: 0,
           periodKey: null,
           paidThroughPeriodKey: null,
@@ -168,7 +175,12 @@ export async function handleStudentRoutes({
 
     const magicUrl = `${siteBase(env)}/account?token=${issued.token}`;
     try {
-      await sendStudentInviteEmail(env, { name, email, magicUrl });
+      await sendStudentInviteEmail(env, {
+        name,
+        email,
+        magicUrl,
+        billingMode: enrollment.billingMode,
+      });
     } catch (err) {
       return json(
         {
@@ -181,13 +193,14 @@ export async function handleStudentRoutes({
       );
     }
 
+    const dueLabel = `$${(
+      (enrollment.amountDueCents || 0) / 100
+    ).toFixed((enrollment.amountDueCents || 0) % 100 === 0 ? 0 : 2)}`;
     return json(
       {
         enrollment: publicEnrollment(enrollment),
         magicUrl,
-        summary: `Invite sent to ${email}. Amount due now: $${(
-          (enrollment.amountDueCents || 0) / 100
-        ).toFixed((enrollment.amountDueCents || 0) % 100 === 0 ? 0 : 2)}.`,
+        summary: `Invite sent to ${email} (${enrollment.billingMode}). Amount due now: ${dueLabel}.`,
       },
       200,
       origin
@@ -218,6 +231,7 @@ export async function handleStudentRoutes({
         name: enrollment.name,
         email: enrollment.email,
         magicUrl,
+        billingMode: enrollment.billingMode || "manual",
       });
     } catch (err) {
       return json(
@@ -300,6 +314,7 @@ export async function handleStudentRoutes({
         name: enrollment.name,
         email: enrollment.email,
         magicUrl,
+        billingMode: enrollment.billingMode || "manual",
       });
     } catch (err) {
       console.error("request-link email failed:", err);

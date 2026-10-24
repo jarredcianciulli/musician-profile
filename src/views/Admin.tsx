@@ -53,6 +53,15 @@ const DAY_LABELS: { day: Weekday; label: string }[] = [
   { day: 6, label: "Saturday" },
 ];
 
+type AdminTab = "students" | "bookings" | "schedule" | "marketing";
+
+const ADMIN_TABS: { id: AdminTab; label: string }[] = [
+  { id: "students", label: "Students" },
+  { id: "bookings", label: "Bookings" },
+  { id: "schedule", label: "Schedule" },
+  { id: "marketing", label: "Marketing" },
+];
+
 const emptyHoliday = (): HolidayWeek => ({
   id: newId("holiday"),
   title: "",
@@ -92,6 +101,9 @@ const Admin: React.FC = () => {
     DEFAULT_SUBSCRIPTION_MINUTES
   );
   const [inviteFormat, setInviteFormat] = useState<LessonFormat>("in_person");
+  const [inviteBilling, setInviteBilling] = useState<"manual" | "auto">(
+    "manual"
+  );
   const [inviteSlots, setInviteSlots] = useState<
     { start: string; end: string; label: string }[]
   >([]);
@@ -105,6 +117,7 @@ const Admin: React.FC = () => {
   );
   const [inviteError, setInviteError] = useState("");
   const [resendBusyId, setResendBusyId] = useState("");
+  const [adminTab, setAdminTab] = useState<AdminTab>("students");
 
   useEffect(() => {
     if (!authed) return;
@@ -225,6 +238,7 @@ const Admin: React.FC = () => {
           start,
           end,
           format: inviteFormat,
+          billingMode: inviteBilling,
         },
         token
       );
@@ -475,7 +489,28 @@ const Admin: React.FC = () => {
           </p>
         )}
 
+        <nav
+          className="flex flex-wrap gap-1 border-b border-line -mb-6"
+          aria-label="Admin sections"
+        >
+          {ADMIN_TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setAdminTab(t.id)}
+              className={`px-4 py-2.5 text-sm border-b-2 -mb-px transition-colors ${
+                adminTab === t.id
+                  ? "border-sky-ink text-ink font-medium"
+                  : "border-transparent text-muted hover:text-ink"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
+
         {/* Teaching hours */}
+        {adminTab === "schedule" ? (
         <section>
           <h2 className="font-display text-2xl mb-2">Teaching hours</h2>
           <p className="text-sm text-muted mb-6">
@@ -610,8 +645,10 @@ const Admin: React.FC = () => {
             </button>
           </form>
         </section>
+        ) : null}
 
         {/* Leads */}
+        {adminTab === "bookings" ? (
         <section>
           <h2 className="font-display text-2xl mb-2">Leads</h2>
           <p className="text-sm text-muted mb-6">
@@ -698,13 +735,15 @@ const Admin: React.FC = () => {
             </div>
           )}
         </section>
+        ) : null}
 
         {/* Invite student */}
+        {adminTab === "students" ? (
         <section>
           <h2 className="font-display text-2xl mb-2">Invite student</h2>
           <p className="text-sm text-muted mb-6">
-            Email a magic link to their account portal. They see their weekly
-            schedule and choose auto-charge or pay what&apos;s due.
+            Email a magic link to their account. You set billing on the invite;
+            they see their schedule and pay (or set up auto-charge).
           </p>
           <form
             onSubmit={sendInvite}
@@ -735,7 +774,7 @@ const Admin: React.FC = () => {
                 />
               </label>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <label className="text-sm block">
                 <span className="text-muted text-xs uppercase tracking-wider">
                   Length
@@ -769,6 +808,21 @@ const Admin: React.FC = () => {
                 >
                   <option value="in_person">In person</option>
                   <option value="online">Online</option>
+                </select>
+              </label>
+              <label className="text-sm block">
+                <span className="text-muted text-xs uppercase tracking-wider">
+                  Billing
+                </span>
+                <select
+                  className="admin-input mt-1"
+                  value={inviteBilling}
+                  onChange={(e) =>
+                    setInviteBilling(e.target.value as "manual" | "auto")
+                  }
+                >
+                  <option value="manual">Pay by link (manual)</option>
+                  <option value="auto">Auto-charge monthly</option>
                 </select>
               </label>
             </div>
@@ -918,8 +972,10 @@ const Admin: React.FC = () => {
             </div>
           ) : null}
         </section>
+        ) : null}
 
         {/* Bookings */}
+        {adminTab === "bookings" ? (
         <section>
           <h2 className="font-display text-2xl mb-2">Upcoming bookings</h2>
           <p className="text-sm text-muted mb-6">
@@ -976,8 +1032,10 @@ const Admin: React.FC = () => {
             </ul>
           )}
         </section>
+        ) : null}
 
         {/* Subscriptions */}
+        {adminTab === "students" ? (
         <section>
           <h2 className="font-display text-2xl mb-2">Subscriptions</h2>
           <p className="text-sm text-muted mb-6">
@@ -1050,7 +1108,9 @@ const Admin: React.FC = () => {
             </ul>
           )}
         </section>
+        ) : null}
 
+        {adminTab === "schedule" ? (
         <section className="grid grid-cols-1 xl:grid-cols-2 gap-10">
           {/* Holidays */}
           <div>
@@ -1290,8 +1350,10 @@ const Admin: React.FC = () => {
             </form>
           </div>
         </section>
+        ) : null}
 
         {/* Flyer campaigns */}
+        {adminTab === "marketing" ? (
         <section>
           <h2 className="font-display text-2xl mb-2">Flyer URLs</h2>
           <p className="text-sm text-muted mb-6">
@@ -1370,6 +1432,7 @@ const Admin: React.FC = () => {
             </button>
           </form>
         </section>
+        ) : null}
 
         <p className="text-xs text-muted pb-8">
           Last updated: {payload.updatedAt}

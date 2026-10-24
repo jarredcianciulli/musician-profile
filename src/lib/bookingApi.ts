@@ -383,6 +383,8 @@ export async function inviteStudent(
     start: string;
     end: string;
     format?: LessonFormat;
+    /** Admin-chosen path; default manual (pay by link). Auto kept for later. */
+    billingMode?: "manual" | "auto";
   },
   adminToken: string
 ): Promise<StudentInviteResult> {

@@ -196,9 +196,12 @@ const Account: React.FC = () => {
 
   const { enrollment, schedule, payments } = data;
   const due = enrollment.amountDueCents || 0;
-  const mode = enrollment.billingMode || "unset";
+  const mode = enrollment.billingMode || "manual";
+  const autoReady = mode === "auto" && Boolean(enrollment.stripeSubscriptionId);
+  const showAutoSetup = mode === "auto" && !enrollment.stripeSubscriptionId;
+  const showManualPay = mode === "manual" || mode === "unset";
+  // unset = legacy invites; show both. New invites set manual or auto.
   const showChoice = mode === "unset";
-  const showManualPay = mode === "manual";
 
   return (
     <div className="section-container py-16 max-w-xl">
@@ -264,7 +267,7 @@ const Account: React.FC = () => {
 
       <section className="mb-10">
         <h2 className="font-display text-2xl mb-2">Billing</h2>
-        {mode === "auto" && enrollment.stripeSubscriptionId ? (
+        {autoReady ? (
           <div className="border border-line bg-white px-4 py-4 text-sm space-y-1">
             <p className="font-medium">Auto-charge monthly</p>
             <p className="text-ink-soft">
@@ -274,6 +277,22 @@ const Account: React.FC = () => {
                 : ""}
             </p>
             <p className="text-muted">Nothing due right now.</p>
+          </div>
+        ) : showAutoSetup ? (
+          <div className="border border-line bg-white px-4 py-4 text-sm space-y-3">
+            <p className="font-medium">Set up monthly auto-charge</p>
+            <p className="text-ink-soft">
+              First period: {formatMoney(due)} (proration if mid-month), then
+              monthly tuition on your card.
+            </p>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={Boolean(checkoutBusy)}
+              onClick={() => onCheckout("auto")}
+            >
+              {checkoutBusy === "auto" ? "Redirecting…" : "Continue to Stripe"}
+            </button>
           </div>
         ) : (
           <div className="border border-line bg-white px-4 py-4 text-sm space-y-3">
@@ -324,14 +343,6 @@ const Account: React.FC = () => {
             ) : (
               <p className="text-muted">You&apos;re paid up for this period.</p>
             )}
-
-            {showChoice ? (
-              <p className="text-xs text-muted leading-relaxed pt-1">
-                Auto-charge keeps a card on file and bills monthly. Or pay
-                only what&apos;s due now and come back each month with a magic
-                link.
-              </p>
-            ) : null}
           </div>
         )}
       </section>

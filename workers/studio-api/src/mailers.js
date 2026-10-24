@@ -168,19 +168,22 @@ export async function sendSubscriptionBookedEmails(env, sub, reservation) {
 }
 
 /** Magic-link invite to student billing portal. */
-export async function sendStudentInviteEmail(env, { name, email, magicUrl }) {
+export async function sendStudentInviteEmail(
+  env,
+  { name, email, magicUrl, billingMode = "manual" }
+) {
   const inbox = studioInbox(env);
+  const isAuto = billingMode === "auto";
+  const billingBlurb = isAuto
+    ? `<p>Your weekly lesson spot is ready. Open your account to see your schedule and set up <strong>monthly auto-charge</strong> (card on file).</p>`
+    : `<p>Your weekly lesson spot is ready. Open your account to see your schedule and <strong>pay what’s due</strong> for this period with a secure link.</p>`;
   const result = await sendTransactionalEmail(env, {
     to: email,
     toName: name || email,
     subject: "Your Battery String Studio account — set up billing",
     html: wrap(`
       <h2 style="font-weight:600">Welcome${name ? `, ${escapeHtml(name)}` : ""}</h2>
-      <p>Your weekly lesson spot is ready. Open your account to see your schedule and choose how to pay:</p>
-      <ul>
-        <li><strong>Auto-charge</strong> — card on file, billed monthly</li>
-        <li><strong>Pay what’s due</strong> — pay each period with a secure link</li>
-      </ul>
+      ${billingBlurb}
       <p><a href="${escapeHtml(magicUrl)}" style="display:inline-block;padding:12px 18px;background:#1b3a5c;color:#fff;text-decoration:none">Open your account</a></p>
       <p style="font-size:13px;color:#666">This link expires in 48 hours. You can request a new one from the account page.</p>
     `),
