@@ -31,10 +31,11 @@ import {
 } from "../types/studio";
 import { siteUrl } from "../lib/env";
 import {
-  createAdminSubscriptionCheckout,
   fetchSubscriptionSlots,
+  inviteStudent,
+  resendStudentMagicLink,
   updateLeadStatus,
-  type AdminCheckoutResult,
+  type StudentInviteResult,
 } from "../lib/bookingApi";
 import {
   DEFAULT_SUBSCRIPTION_MINUTES,
@@ -85,23 +86,25 @@ const Admin: React.FC = () => {
   const [flyerCode, setFlyerCode] = useState("");
   const [flyerLabel, setFlyerLabel] = useState("");
 
-  const [payName, setPayName] = useState("");
-  const [payEmail, setPayEmail] = useState("");
-  const [payDuration, setPayDuration] = useState<SubscriptionDuration>(
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteDuration, setInviteDuration] = useState<SubscriptionDuration>(
     DEFAULT_SUBSCRIPTION_MINUTES
   );
-  const [payFormat, setPayFormat] = useState<LessonFormat>("in_person");
-  const [payBilling, setPayBilling] = useState<"auto" | "manual">("auto");
-  const [paySlots, setPaySlots] = useState<
+  const [inviteFormat, setInviteFormat] = useState<LessonFormat>("in_person");
+  const [inviteSlots, setInviteSlots] = useState<
     { start: string; end: string; label: string }[]
   >([]);
-  const [paySlotStart, setPaySlotStart] = useState("");
-  const [payUseCustomTime, setPayUseCustomTime] = useState(true);
-  const [payCustomLocal, setPayCustomLocal] = useState("");
-  const [payLoadingSlots, setPayLoadingSlots] = useState(false);
-  const [paySubmitting, setPaySubmitting] = useState(false);
-  const [payResult, setPayResult] = useState<AdminCheckoutResult | null>(null);
-  const [payError, setPayError] = useState("");
+  const [inviteSlotStart, setInviteSlotStart] = useState("");
+  const [inviteUseCustomTime, setInviteUseCustomTime] = useState(true);
+  const [inviteCustomLocal, setInviteCustomLocal] = useState("");
+  const [inviteLoadingSlots, setInviteLoadingSlots] = useState(false);
+  const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  const [inviteResult, setInviteResult] = useState<StudentInviteResult | null>(
+    null
+  );
+  const [inviteError, setInviteError] = useState("");
+  const [resendBusyId, setResendBusyId] = useState("");
 
   useEffect(() => {
     if (!authed) return;
@@ -111,9 +114,9 @@ const Admin: React.FC = () => {
   useEffect(() => {
     if (!authed) return;
     let cancelled = false;
-    setPayLoadingSlots(true);
-    setPayError("");
-    fetchSubscriptionSlots(payDuration)
+    setInviteLoadingSlots(true);
+    setInviteError("");
+    fetchSubscriptionSlots(inviteDuration)
       .then((result) => {
         if (cancelled) return;
         const tz = result.availability?.timezone || "America/New_York";
@@ -122,27 +125,27 @@ const Admin: React.FC = () => {
           end: s.end,
           label: `${formatSlotDay(s.start, tz)} · ${formatSlotTime(s.start, tz)}`,
         }));
-        setPaySlots(opts);
-        setPaySlotStart((prev) =>
+        setInviteSlots(opts);
+        setInviteSlotStart((prev) =>
           opts.some((o) => o.start === prev) ? prev : opts[0]?.start || ""
         );
       })
       .catch((err) => {
         if (!cancelled) {
-          setPaySlots([]);
-          setPaySlotStart("");
-          setPayError(
+          setInviteSlots([]);
+          setInviteSlotStart("");
+          setInviteError(
             err instanceof Error ? err.message : "Could not load open slots."
           );
         }
       })
       .finally(() => {
-        if (!cancelled) setPayLoadingSlots(false);
+        if (!cancelled) setInviteLoadingSlots(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [authed, payDuration]);
+  }, [authed, inviteDuration]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,69 +175,69 @@ const Admin: React.FC = () => {
     );
   };
 
-  const createPayLink = async (e: React.FormEvent) => {
+  const sendInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    setPayError("");
-    setPayResult(null);
+    setInviteError("");
+    setInviteResult(null);
     const token = getAdminToken();
     if (!token) {
-      setPayError("Re-login required.");
+      setInviteError("Re-login required.");
       return;
     }
-    if (!payName.trim() || !payEmail.trim()) {
-      setPayError("Name and email are required.");
+    if (!inviteName.trim() || !inviteEmail.trim()) {
+      setInviteError("Name and email are required.");
       return;
     }
 
     let start = "";
     let end = "";
-    if (payUseCustomTime) {
-      if (!payCustomLocal) {
-        setPayError("Enter the weekly lesson date and time.");
+    if (inviteUseCustomTime) {
+      if (!inviteCustomLocal) {
+        setInviteError("Enter the weekly lesson date and time.");
         return;
       }
-      const startDate = new Date(payCustomLocal);
+      const startDate = new Date(inviteCustomLocal);
       if (Number.isNaN(startDate.getTime())) {
-        setPayError("Invalid date/time.");
+        setInviteError("Invalid date/time.");
         return;
       }
       start = startDate.toISOString();
       end = new Date(
-        startDate.getTime() + payDuration * 60 * 1000
+        startDate.getTime() + inviteDuration * 60 * 1000
       ).toISOString();
     } else {
-      const slot = paySlots.find((s) => s.start === paySlotStart);
+      const slot = inviteSlots.find((s) => s.start === inviteSlotStart);
       if (!slot) {
-        setPayError("Pick an open weekly time.");
+        setInviteError("Pick an open weekly time.");
         return;
       }
       start = slot.start;
       end = slot.end;
     }
 
-    setPaySubmitting(true);
+    setInviteSubmitting(true);
     try {
-      const result = await createAdminSubscriptionCheckout(
+      const result = await inviteStudent(
         {
-          name: payName.trim(),
-          email: payEmail.trim(),
-          durationMinutes: payDuration,
+          name: inviteName.trim(),
+          email: inviteEmail.trim(),
+          durationMinutes: inviteDuration,
           start,
           end,
-          format: payFormat,
-          billingMode: payBilling,
-          allowPast: true,
+          format: inviteFormat,
         },
         token
       );
-      setPayResult(result);
+      setInviteResult(result);
       setStatus(result.summary);
       const refreshed = await loadStudio({ includePrivate: true });
       setPayload(refreshed);
     } catch (err) {
-      setPayError(err instanceof Error ? err.message : "Could not create link.");
+      setInviteError(
+        err instanceof Error ? err.message : "Could not send invite."
+      );
     } finally {
-      setPaySubmitting(false);
+      setInviteSubmitting(false);
     }
   };
 
@@ -244,6 +247,32 @@ const Admin: React.FC = () => {
       setStatus("Copied to clipboard.");
     } catch {
       setStatus("Could not copy — select the URL manually.");
+    }
+  };
+
+  const resendInvite = async (enrollmentId: string) => {
+    const token = getAdminToken();
+    if (!token) {
+      setStatus("Re-login required.");
+      return;
+    }
+    setResendBusyId(enrollmentId);
+    try {
+      const result = await resendStudentMagicLink(enrollmentId, token);
+      if (result.magicUrl) {
+        try {
+          await navigator.clipboard.writeText(result.magicUrl);
+          setStatus("Magic link resent and copied.");
+        } catch {
+          setStatus("Magic link resent.");
+        }
+      } else {
+        setStatus("Magic link resent.");
+      }
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Resend failed.");
+    } finally {
+      setResendBusyId("");
     }
   };
 
@@ -669,15 +698,15 @@ const Admin: React.FC = () => {
           )}
         </section>
 
-        {/* Student payment link */}
+        {/* Invite student */}
         <section>
-          <h2 className="font-display text-2xl mb-2">Student payment link</h2>
+          <h2 className="font-display text-2xl mb-2">Invite student</h2>
           <p className="text-sm text-muted mb-6">
-            Create a Stripe Checkout URL to text or email. Auto-charge keeps a
-            card on file; manual gives a reusable monthly link for each 1st.
+            Email a magic link to their account portal. They see their weekly
+            schedule and choose auto-charge or pay what&apos;s due.
           </p>
           <form
-            onSubmit={createPayLink}
+            onSubmit={sendInvite}
             className="bg-white border border-line p-5 space-y-4 max-w-xl"
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -687,8 +716,8 @@ const Admin: React.FC = () => {
                 </span>
                 <input
                   className="admin-input mt-1"
-                  value={payName}
-                  onChange={(e) => setPayName(e.target.value)}
+                  value={inviteName}
+                  onChange={(e) => setInviteName(e.target.value)}
                   required
                 />
               </label>
@@ -699,22 +728,24 @@ const Admin: React.FC = () => {
                 <input
                   type="email"
                   className="admin-input mt-1"
-                  value={payEmail}
-                  onChange={(e) => setPayEmail(e.target.value)}
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
                   required
                 />
               </label>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="text-sm block">
                 <span className="text-muted text-xs uppercase tracking-wider">
                   Length
                 </span>
                 <select
                   className="admin-input mt-1"
-                  value={payDuration}
+                  value={inviteDuration}
                   onChange={(e) =>
-                    setPayDuration(Number(e.target.value) as SubscriptionDuration)
+                    setInviteDuration(
+                      Number(e.target.value) as SubscriptionDuration
+                    )
                   }
                 >
                   {SUBSCRIPTION_DURATIONS.map((m) => (
@@ -730,26 +761,13 @@ const Admin: React.FC = () => {
                 </span>
                 <select
                   className="admin-input mt-1"
-                  value={payFormat}
-                  onChange={(e) => setPayFormat(e.target.value as LessonFormat)}
+                  value={inviteFormat}
+                  onChange={(e) =>
+                    setInviteFormat(e.target.value as LessonFormat)
+                  }
                 >
                   <option value="in_person">In person</option>
                   <option value="online">Online</option>
-                </select>
-              </label>
-              <label className="text-sm block">
-                <span className="text-muted text-xs uppercase tracking-wider">
-                  Billing
-                </span>
-                <select
-                  className="admin-input mt-1"
-                  value={payBilling}
-                  onChange={(e) =>
-                    setPayBilling(e.target.value as "auto" | "manual")
-                  }
-                >
-                  <option value="auto">Auto-charge monthly</option>
-                  <option value="manual">Pay by link each month</option>
                 </select>
               </label>
             </div>
@@ -760,12 +778,12 @@ const Admin: React.FC = () => {
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
                   type="radio"
-                  checked={payUseCustomTime}
-                  onChange={() => setPayUseCustomTime(true)}
+                  checked={inviteUseCustomTime}
+                  onChange={() => setInviteUseCustomTime(true)}
                 />
                 Custom date/time (past OK — sets weekday + time)
               </label>
-              {payUseCustomTime ? (
+              {inviteUseCustomTime ? (
                 <label className="text-sm block">
                   <span className="text-muted text-xs uppercase tracking-wider">
                     First lesson (local time)
@@ -773,38 +791,38 @@ const Admin: React.FC = () => {
                   <input
                     type="datetime-local"
                     className="admin-input mt-1"
-                    value={payCustomLocal}
-                    onChange={(e) => setPayCustomLocal(e.target.value)}
-                    required={payUseCustomTime}
+                    value={inviteCustomLocal}
+                    onChange={(e) => setInviteCustomLocal(e.target.value)}
+                    required={inviteUseCustomTime}
                   />
                   <span className="block text-xs text-muted mt-1">
                     Example: today&apos;s Friday time even if it already
-                    started. Proration counts remaining Fridays from now.
+                    started. Proration counts remaining lessons from now.
                   </span>
                 </label>
               ) : null}
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
                   type="radio"
-                  checked={!payUseCustomTime}
-                  onChange={() => setPayUseCustomTime(false)}
+                  checked={!inviteUseCustomTime}
+                  onChange={() => setInviteUseCustomTime(false)}
                 />
                 Pick from open future slots
               </label>
-              {!payUseCustomTime ? (
+              {!inviteUseCustomTime ? (
                 <select
                   className="admin-input"
-                  value={paySlotStart}
-                  onChange={(e) => setPaySlotStart(e.target.value)}
-                  disabled={payLoadingSlots || paySlots.length === 0}
-                  required={!payUseCustomTime}
+                  value={inviteSlotStart}
+                  onChange={(e) => setInviteSlotStart(e.target.value)}
+                  disabled={inviteLoadingSlots || inviteSlots.length === 0}
+                  required={!inviteUseCustomTime}
                 >
-                  {payLoadingSlots ? (
+                  {inviteLoadingSlots ? (
                     <option value="">Loading times…</option>
-                  ) : paySlots.length === 0 ? (
+                  ) : inviteSlots.length === 0 ? (
                     <option value="">No open slots</option>
                   ) : (
-                    paySlots.map((s) => (
+                    inviteSlots.map((s) => (
                       <option key={s.start} value={s.start}>
                         {s.label}
                       </option>
@@ -813,71 +831,91 @@ const Admin: React.FC = () => {
                 </select>
               ) : null}
             </fieldset>
-            {payError ? (
+            {inviteError ? (
               <p className="text-sm text-accent" role="alert">
-                {payError}
+                {inviteError}
               </p>
             ) : null}
             <button
               type="submit"
               className="btn-primary"
               disabled={
-                paySubmitting ||
-                (payUseCustomTime ? !payCustomLocal : !paySlotStart)
+                inviteSubmitting ||
+                (inviteUseCustomTime ? !inviteCustomLocal : !inviteSlotStart)
               }
             >
-              {paySubmitting ? "Creating…" : "Create payment link"}
+              {inviteSubmitting ? "Sending…" : "Send invite"}
             </button>
-            {payResult ? (
+            {inviteResult ? (
               <div className="border border-line bg-paper-muted/40 px-4 py-3 space-y-3 text-sm">
-                <p className="text-ink-soft">{payResult.summary}</p>
+                <p className="text-ink-soft">{inviteResult.summary}</p>
                 <div>
                   <p className="text-xs uppercase tracking-wider text-muted mb-1">
-                    {payResult.billingMode === "manual"
-                      ? "Pay remaining lessons (send now)"
-                      : "Checkout (send now)"}
+                    Magic link (also emailed)
                   </p>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <input
                       className="admin-input flex-1 text-xs"
                       readOnly
-                      value={payResult.checkoutUrl}
+                      value={inviteResult.magicUrl}
                     />
                     <button
                       type="button"
                       className="btn-secondary shrink-0"
-                      onClick={() => copyText(payResult.checkoutUrl)}
+                      onClick={() => copyText(inviteResult.magicUrl)}
                     >
                       Copy
                     </button>
                   </div>
                 </div>
-                {payResult.monthlyPaymentLinkUrl ? (
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-muted mb-1">
-                      Monthly tuition (reuse each 1st)
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <input
-                        className="admin-input flex-1 text-xs"
-                        readOnly
-                        value={payResult.monthlyPaymentLinkUrl}
-                      />
-                      <button
-                        type="button"
-                        className="btn-secondary shrink-0"
-                        onClick={() =>
-                          copyText(payResult.monthlyPaymentLinkUrl || "")
-                        }
-                      >
-                        Copy
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
               </div>
             ) : null}
           </form>
+
+          {(payload.enrollments || []).length > 0 ? (
+            <div className="mt-8 max-w-2xl">
+              <h3 className="font-display text-xl mb-3">Enrolled students</h3>
+              <ul className="space-y-2">
+                {[...(payload.enrollments || [])]
+                  .sort((a, b) =>
+                    (b.createdAt || "").localeCompare(a.createdAt || "")
+                  )
+                  .map((enr) => (
+                    <li
+                      key={enr.id}
+                      className="bg-white border border-line px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm"
+                    >
+                      <div>
+                        <p className="font-medium">{enr.name}</p>
+                        <p className="text-muted">
+                          {enr.email} · {enr.durationMinutes} min ·{" "}
+                          {enr.billingMode || "unset"}
+                          {typeof enr.amountDueCents === "number"
+                            ? ` · due $${(enr.amountDueCents / 100).toFixed(
+                                enr.amountDueCents % 100 === 0 ? 0 : 2
+                              )}`
+                            : ""}
+                        </p>
+                        <p className="text-xs text-muted mt-0.5">
+                          {formatSlotDay(enr.slotStart, tz)} ·{" "}
+                          {formatSlotTime(enr.slotStart, tz)} · {enr.status}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-secondary shrink-0 text-xs"
+                        disabled={resendBusyId === enr.id}
+                        onClick={() => resendInvite(enr.id)}
+                      >
+                        {resendBusyId === enr.id
+                          ? "Sending…"
+                          : "Resend magic link"}
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          ) : null}
         </section>
 
         {/* Bookings */}

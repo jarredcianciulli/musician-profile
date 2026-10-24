@@ -21,6 +21,10 @@ import {
   sendSubscriptionBookedEmails,
   sendTrialBookedEmails,
 } from "./mailers.js";
+import {
+  handleStudentRoutes,
+  confirmEnrollmentFromSession,
+} from "./studentRoutes.js";
 
 const STORE_KEY = "studio_payload_v2";
 const HOLD_TTL_MS = 20 * 60 * 1000;
@@ -70,6 +74,8 @@ const seed = {
   bookings: [],
   subscriptions: [],
   reservations: [],
+  enrollments: [],
+  payments: [],
   leads: [],
   flyers: seedFlyers,
   holidays: [
@@ -178,6 +184,8 @@ function normalizePayload(raw) {
     bookings: Array.isArray(raw.bookings) ? raw.bookings : [],
     subscriptions: Array.isArray(raw.subscriptions) ? raw.subscriptions : [],
     reservations,
+    enrollments: Array.isArray(raw.enrollments) ? raw.enrollments : [],
+    payments: Array.isArray(raw.payments) ? raw.payments : [],
     leads: Array.isArray(raw.leads) ? raw.leads : [],
     flyers: Array.isArray(raw.flyers) && raw.flyers.length
       ? raw.flyers
@@ -744,6 +752,19 @@ export default {
 
     const route = path.startsWith("/studio") ? path : `/studio${path}`;
 
+    const studentResponse = await handleStudentRoutes({
+      request,
+      env,
+      route,
+      url,
+      origin,
+      json,
+      getBearer,
+      readPayload,
+      writePayload,
+    });
+    if (studentResponse) return studentResponse;
+
     // Stripe webhook — no CORS origin required
     if (request.method === "POST" && route === "/studio/booking/webhook") {
       const rawBody = await request.text();
@@ -790,6 +811,19 @@ export default {
             session
           );
           payload = result.payload;
+        }
+
+        if (
+          meta.type === "enrollment_subscription" ||
+          meta.type === "manual_due"
+        ) {
+          const result = await confirmEnrollmentFromSession(
+            env,
+            payload,
+            session
+          );
+          payload = result.payload;
+          await writePayload(env, payload);
         }
       }
 
@@ -873,6 +907,12 @@ export default {
         reservations: Array.isArray(body.reservations)
           ? body.reservations
           : current.reservations,
+        enrollments: Array.isArray(body.enrollments)
+          ? body.enrollments
+          : current.enrollments,
+        payments: Array.isArray(body.payments)
+          ? body.payments
+          : current.payments,
         leads: Array.isArray(body.leads) ? body.leads : current.leads,
         flyers: Array.isArray(body.flyers) ? body.flyers : current.flyers,
         updatedAt: new Date().toISOString(),

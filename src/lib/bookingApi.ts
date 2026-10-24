@@ -2,6 +2,8 @@ import {
   AvailabilityConfig,
   LessonBooking,
   LessonFormat,
+  StudentEnrollment,
+  StudentPayment,
   StudioSubscription,
   TimeSlot,
 } from "../types/studio";
@@ -265,6 +267,160 @@ export type AdminCheckoutResult = {
   proration: ProrationResult;
   summary: string;
 };
+
+const ACCOUNT_SESSION_KEY = "bss_account_session";
+
+export function getAccountSessionToken(): string {
+  try {
+    return sessionStorage.getItem(ACCOUNT_SESSION_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+export function setAccountSessionToken(token: string) {
+  try {
+    sessionStorage.setItem(ACCOUNT_SESSION_KEY, token);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearAccountSessionToken() {
+  try {
+    sessionStorage.removeItem(ACCOUNT_SESSION_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export type AccountPortalData = {
+  sessionToken?: string;
+  enrollment: StudentEnrollment;
+  schedule: { start: string; end: string; status?: string }[];
+  payments: StudentPayment[];
+};
+
+export async function exchangeAccountMagicToken(
+  token: string
+): Promise<AccountPortalData> {
+  if (!apiBase) throw new Error("Account portal requires the studio API.");
+  const res = await fetch(
+    `${apiBase}/studio/account/session?token=${encodeURIComponent(token)}`
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Invalid or expired link.");
+  }
+  if (data.sessionToken) setAccountSessionToken(data.sessionToken);
+  return data as AccountPortalData;
+}
+
+export async function requestAccountMagicLink(email: string): Promise<{
+  ok: boolean;
+  message: string;
+}> {
+  if (!apiBase) throw new Error("Account portal requires the studio API.");
+  const res = await fetch(`${apiBase}/studio/account/request-link`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not request sign-in link.");
+  }
+  return data as { ok: boolean; message: string };
+}
+
+export async function fetchAccountMe(): Promise<AccountPortalData> {
+  if (!apiBase) throw new Error("Account portal requires the studio API.");
+  const token = getAccountSessionToken();
+  if (!token) throw new Error("Not signed in.");
+  const res = await fetch(`${apiBase}/studio/account/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    clearAccountSessionToken();
+    throw new Error(data.error || "Session expired.");
+  }
+  return data as AccountPortalData;
+}
+
+export async function startAccountCheckout(
+  mode: "auto" | "manual"
+): Promise<{ url: string }> {
+  if (!apiBase) throw new Error("Account portal requires the studio API.");
+  const token = getAccountSessionToken();
+  if (!token) throw new Error("Not signed in.");
+  const res = await fetch(`${apiBase}/studio/account/checkout`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ mode }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not start checkout.");
+  }
+  return data as { url: string };
+}
+
+export type StudentInviteResult = {
+  enrollment: StudentEnrollment;
+  magicUrl: string;
+  summary: string;
+};
+
+export async function inviteStudent(
+  input: {
+    name: string;
+    email: string;
+    durationMinutes: 30 | 45 | 60;
+    start: string;
+    end: string;
+    format?: LessonFormat;
+  },
+  adminToken: string
+): Promise<StudentInviteResult> {
+  if (!apiBase) throw new Error("Invite requires the studio API.");
+  const res = await fetch(`${apiBase}/studio/students/invite`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${adminToken}`,
+    },
+    body: JSON.stringify(input),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not send invite.");
+  }
+  return data as StudentInviteResult;
+}
+
+export async function resendStudentMagicLink(
+  enrollmentId: string,
+  adminToken: string
+): Promise<{ ok: boolean; magicUrl: string }> {
+  if (!apiBase) throw new Error("Requires the studio API.");
+  const res = await fetch(`${apiBase}/studio/students/resend-link`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${adminToken}`,
+    },
+    body: JSON.stringify({ enrollmentId }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not resend link.");
+  }
+  return data as { ok: boolean; magicUrl: string };
+}
 
 /** Admin-authenticated Checkout / Payment Link for a student. */
 export async function createAdminSubscriptionCheckout(

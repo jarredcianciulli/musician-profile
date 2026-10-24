@@ -201,8 +201,8 @@ export async function createProrationPaymentSession(env, {
           currency: "usd",
           unit_amount: prorateCents,
           product_data: {
-            name: `First-month lessons (${durationMinutes} min)`,
-            description: "Remaining lessons this month — Battery String Studio",
+            name: `Lesson tuition (${durationMinutes} min)`,
+            description: "Period payment — Battery String Studio",
           },
         },
       },

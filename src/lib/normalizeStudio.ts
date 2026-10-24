@@ -39,6 +39,8 @@ export function normalizeStudioPayload(
       : [],
     flyers: Array.isArray(payload.flyers) ? payload.flyers : seed.flyers || [],
     leads: Array.isArray(payload.leads) ? payload.leads : [],
+    enrollments: Array.isArray(payload.enrollments) ? payload.enrollments : [],
+    payments: Array.isArray(payload.payments) ? payload.payments : [],
     updatedAt: payload.updatedAt || new Date().toISOString(),
   };
 }

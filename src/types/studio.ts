@@ -146,6 +146,39 @@ export type BusyInterval = {
   end: string;
 };
 
+export type StudentBillingMode = "unset" | "auto" | "manual";
+
+export type StudentEnrollment = {
+  id: string;
+  email: string;
+  name: string;
+  slotStart: string;
+  slotEnd: string;
+  durationMinutes: number;
+  format?: LessonFormat;
+  weekday?: number;
+  status: "invited" | "active" | string;
+  billingMode: StudentBillingMode | string;
+  amountDueCents: number;
+  periodKey?: string | null;
+  paidThroughPeriodKey?: string | null;
+  nextDueAt?: string | null;
+  stripeSubscriptionId?: string;
+  createdAt?: string;
+};
+
+export type StudentPayment = {
+  id: string;
+  enrollmentId: string;
+  kind: "proration" | "monthly" | "subscription_setup" | string;
+  amountCents: number;
+  status: "pending" | "paid" | string;
+  stripeSessionId?: string;
+  periodKey?: string;
+  paidAt?: string;
+  createdAt?: string;
+};
+
 export type StudioPayload = {
   holidays: HolidayWeek[];
   events: StudioEvent[];
@@ -154,6 +187,8 @@ export type StudioPayload = {
   bookings: LessonBooking[];
   subscriptions?: StudioSubscription[];
   reservations?: Array<Record<string, unknown>>;
+  enrollments?: StudentEnrollment[];
+  payments?: StudentPayment[];
   flyers?: FlyerCampaign[];
   leads?: StudioLead[];
   updatedAt: string;
