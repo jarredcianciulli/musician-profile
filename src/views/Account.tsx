@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   clearAccountSessionToken,
+  confirmAccountCheckoutSession,
   exchangeAccountMagicToken,
   fetchAccountMe,
   getAccountSessionToken,
@@ -79,8 +80,10 @@ const Account: React.FC = () => {
   const [infoOpen, setInfoOpen] = useState(false);
   const [policyChecked, setPolicyChecked] = useState(false);
   const [paidModalOpen, setPaidModalOpen] = useState(false);
+  const [confirmingPay, setConfirmingPay] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const paidBanner = searchParams.get("paid") === "1";
+  const checkoutSessionId = searchParams.get("session_id") || "";
   const canceledBanner = searchParams.get("canceled") === "1";
 
   useEffect(() => {
@@ -278,11 +281,37 @@ const Account: React.FC = () => {
 
   useEffect(() => {
     if (!paidBanner || !getAccountSessionToken()) return;
-    const t = window.setTimeout(() => {
-      void refresh();
-    }, 1200);
-    return () => window.clearTimeout(t);
-  }, [paidBanner]);
+    let cancelled = false;
+    (async () => {
+      setConfirmingPay(true);
+      try {
+        if (checkoutSessionId) {
+          const next = await confirmAccountCheckoutSession(checkoutSessionId);
+          if (!cancelled) {
+            setData(next);
+            setError("");
+          }
+        } else {
+          await refresh();
+        }
+      } catch {
+        if (!cancelled) {
+          try {
+            await refresh();
+          } catch {
+            /* keep prior error / state */
+          }
+        }
+      } finally {
+        if (!cancelled) setConfirmingPay(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // refresh is stable enough for this return-from-Stripe path
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paidBanner, checkoutSessionId]);
 
   const onRequestLink = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -887,10 +916,16 @@ const Account: React.FC = () => {
           const policyDone = Boolean(enrollment.policyAcceptedAt);
           const needsCheckout =
             !autoReady &&
+            !confirmingPay &&
             (showAutoSetup || showChoice || (showManualPay && due > 0));
           const canCheckout = policyDone || policyChecked;
           return (
             <>
+              {confirmingPay ? (
+                <p className="text-sm text-muted mb-4">
+                  Confirming your payment…
+                </p>
+              ) : null}
               {needsCheckout && !policyDone ? (
                 <div className="border border-line bg-white px-4 py-4 text-sm space-y-3 mb-4">
                   <StudioPolicyBody variant="scroll" showTitle />
@@ -929,6 +964,10 @@ const Account: React.FC = () => {
                       ? ` · renews around ${formatSlotDay(enrollment.nextDueAt, TZ)}`
                       : ""}
                   </p>
+                </div>
+              ) : confirmingPay ? (
+                <div className="border border-line bg-white px-4 py-4 text-sm mb-4">
+                  <p className="text-ink-soft">Updating billing…</p>
                 </div>
               ) : (
                 <div className="border border-line bg-white px-4 py-4 text-sm space-y-3 mb-4">

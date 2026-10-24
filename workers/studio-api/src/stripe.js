@@ -60,7 +60,7 @@ export async function retrieveCheckoutSession(env, sessionId) {
   return stripeRequest(
     env,
     "GET",
-    `/checkout/sessions/${encodeURIComponent(sessionId)}`
+    `/checkout/sessions/${encodeURIComponent(sessionId)}?expand[]=subscription`
   );
 }
 

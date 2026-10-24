@@ -6,6 +6,7 @@ import {
   createSubscriptionCheckoutSession,
   createProrationPaymentSession,
   expireCheckoutSession,
+  retrieveCheckoutSession,
 } from "./stripe.js";
 import { computeProration, weekdayFromDate } from "./proration.js";
 import { sendStudentInviteEmail, sendSubscriptionBookedEmails } from "./mailers.js";
@@ -508,6 +509,61 @@ export async function handleStudentRoutes({
     let payload = await readPayload(env);
     let enrollment = await requireStudentSession(request, payload);
     if (!enrollment) return json({ error: "Unauthorized" }, 401, origin);
+    enrollment = refreshEnrollmentDue(
+      enrollment,
+      payload.availability?.weeklyHours
+    );
+    delete enrollment._proration;
+    payload = updateEnrollment(payload, enrollment);
+    await writePayload(env, payload);
+    return json(portalPayload(enrollment, payload), 200, origin);
+  }
+
+  // Confirm Checkout on return (webhook may lag) so portal hides Pay immediately.
+  if (
+    request.method === "GET" &&
+    route === "/studio/account/checkout-session"
+  ) {
+    const sessionId = url.searchParams.get("session_id") || "";
+    if (!sessionId) {
+      return json({ error: "session_id required" }, 400, origin);
+    }
+    if (!env.STRIPE_SECRET_KEY) {
+      return json({ error: "Stripe is not configured." }, 503, origin);
+    }
+    let payload = await readPayload(env);
+    let enrollment = await requireStudentSession(request, payload);
+    if (!enrollment) return json({ error: "Unauthorized" }, 401, origin);
+
+    try {
+      const session = await retrieveCheckoutSession(env, sessionId);
+      const meta = session?.metadata || {};
+      if (meta.enrollmentId && meta.enrollmentId !== enrollment.id) {
+        return json({ error: "Session does not match this account." }, 403, origin);
+      }
+      const complete =
+        session.status === "complete" ||
+        session.payment_status === "paid" ||
+        session.payment_status === "no_payment_required";
+      if (
+        complete &&
+        (meta.type === "enrollment_subscription" || meta.type === "manual_due")
+      ) {
+        const result = await confirmEnrollmentFromSession(
+          env,
+          payload,
+          session
+        );
+        if (result.enrollment) {
+          payload = result.payload;
+          enrollment = result.enrollment;
+          await writePayload(env, payload);
+        }
+      }
+    } catch (err) {
+      console.error("Account checkout-session confirm failed:", err);
+    }
+
     enrollment = refreshEnrollmentDue(
       enrollment,
       payload.availability?.weeklyHours
