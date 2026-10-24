@@ -73,6 +73,18 @@ const DAY_LABELS: { day: Weekday; label: string }[] = [
 
 type AdminTab = "students" | "bookings" | "schedule" | "marketing" | "emails";
 
+function formatLeadBoth(minLeadHours: number): string {
+  const h = Number.isFinite(minLeadHours) ? Math.max(0, minLeadHours) : 24;
+  const days = h / 24;
+  const hoursLabel =
+    h === 1 ? "1 hour" : `${Number.isInteger(h) ? h : h.toFixed(1)} hours`;
+  const daysLabel =
+    days === 1
+      ? "1 day"
+      : `${Number.isInteger(days) ? days : days.toFixed(2)} days`;
+  return `${hoursLabel} · ${daysLabel}`;
+}
+
 const ADMIN_TABS: { id: AdminTab; label: string }[] = [
   { id: "students", label: "Students" },
   { id: "bookings", label: "Bookings" },
@@ -163,6 +175,7 @@ const Admin: React.FC = () => {
     Record<string, string>
   >({});
   const [adminTab, setAdminTab] = useState<AdminTab>("students");
+  const [leadUnit, setLeadUnit] = useState<"hours" | "days">("hours");
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -177,9 +190,24 @@ const Admin: React.FC = () => {
     }
   }, [searchParams]);
 
+  const leadHours = payload?.availability?.minLeadHours ?? 24;
+  const leadDisplayValue =
+    leadUnit === "days"
+      ? Number.isInteger(leadHours / 24)
+        ? leadHours / 24
+        : Math.round((leadHours / 24) * 100) / 100
+      : Number.isInteger(leadHours)
+        ? leadHours
+        : Math.round(leadHours * 10) / 10;
+
   useEffect(() => {
     if (!authed) return;
-    loadStudio({ includePrivate: true }).then(setPayload);
+    loadStudio({ includePrivate: true }).then((result) => {
+      setPayload(result);
+      const h = result.availability?.minLeadHours ?? 24;
+      if (h >= 24 && h % 24 === 0) setLeadUnit("days");
+      else setLeadUnit("hours");
+    });
   }, [authed]);
 
   useEffect(() => {
@@ -892,6 +920,64 @@ const Admin: React.FC = () => {
                   configured).
                 </p>
               </label>
+            </div>
+
+            <div className="border border-line bg-paper-muted/30 px-4 py-4 space-y-3">
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted">
+                  Minimum booking notice
+                </p>
+                <p className="text-sm text-muted mt-1">
+                  Hide public booking times that start sooner than this window
+                  (e.g. 4 hours). Toggle hours or days — both are shown.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-end gap-3">
+                <label className="text-sm">
+                  <span className="text-muted text-xs uppercase tracking-wider">
+                    Value
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={leadUnit === "days" ? 0.5 : 1}
+                    className="admin-input mt-1 w-28"
+                    value={leadDisplayValue}
+                    onChange={(e) => {
+                      const raw = Number(e.target.value);
+                      if (!Number.isFinite(raw) || raw < 0) return;
+                      const hours =
+                        leadUnit === "days" ? raw * 24 : raw;
+                      setPayload({
+                        ...payload,
+                        availability: {
+                          ...payload.availability,
+                          minLeadHours: hours,
+                        },
+                      });
+                    }}
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="text-muted text-xs uppercase tracking-wider">
+                    Unit
+                  </span>
+                  <select
+                    className="admin-input mt-1"
+                    value={leadUnit}
+                    onChange={(e) => {
+                      const next = e.target.value as "hours" | "days";
+                      setLeadUnit(next);
+                    }}
+                  >
+                    <option value="hours">Hours</option>
+                    <option value="days">Days</option>
+                  </select>
+                </label>
+                <p className="text-sm text-ink pb-2">
+                  {formatLeadBoth(payload.availability.minLeadHours ?? 24)}
+                </p>
+              </div>
             </div>
 
             <div className="divide-y divide-line border border-line">

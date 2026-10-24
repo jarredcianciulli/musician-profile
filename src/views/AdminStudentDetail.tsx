@@ -18,10 +18,12 @@ import { grantStudentEditAccess } from "../lib/adminStudentEditGate";
 import {
   cancelStudentInvite,
   impersonateStudent,
+  recordTrialForStudent,
   resendStudentMagicLink,
 } from "../lib/bookingApi";
 import type {
   HolidayWeek,
+  LessonFormat,
   StudentEnrollment,
   StudioEmailLog,
   StudioPayload,
@@ -30,11 +32,12 @@ import type {
 
 const TZ = "America/New_York";
 
-type NavId = "account" | "subscription" | "custom" | "emails";
+type NavId = "account" | "subscription" | "custom" | "trial" | "emails";
 
 const NAV: { id: NavId; label: string }[] = [
   { id: "account", label: "Account" },
   { id: "subscription", label: "Subscription" },
+  { id: "trial", label: "Record trial" },
   { id: "custom", label: "Custom info" },
   { id: "emails", label: "Emails" },
 ];
@@ -56,6 +59,14 @@ const AdminStudentDetail: React.FC = () => {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [section, setSection] = useState<NavId>("account");
+  const [trialLocal, setTrialLocal] = useState("");
+  const [trialDuration, setTrialDuration] = useState<30 | 45>(30);
+  const [trialFormat, setTrialFormat] = useState<LessonFormat>("in_person");
+  const [trialAmount, setTrialAmount] = useState("35");
+  const [trialWaive, setTrialWaive] = useState(false);
+  const [trialMarkPaid, setTrialMarkPaid] = useState(true);
+  const [trialSendEmail, setTrialSendEmail] = useState(false);
+  const [trialSummary, setTrialSummary] = useState("");
 
   useEffect(() => {
     if (!getAdminToken()) {
@@ -180,6 +191,69 @@ const AdminStudentDetail: React.FC = () => {
       setError(
         err instanceof Error ? err.message : "Could not open student portal."
       );
+      setBusy("");
+    }
+  };
+
+  const onRecordTrial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = getAdminToken();
+    if (!token || !enrollment) return;
+    setError("");
+    setTrialSummary("");
+    if (!trialLocal) {
+      setError("Choose the trial date and time.");
+      return;
+    }
+    const startDate = new Date(trialLocal);
+    if (Number.isNaN(startDate.getTime())) {
+      setError("Invalid date/time.");
+      return;
+    }
+    const start = startDate.toISOString();
+    const end = new Date(
+      startDate.getTime() + trialDuration * 60 * 1000
+    ).toISOString();
+    const amountDollars = trialWaive ? undefined : Number(trialAmount);
+    if (
+      !trialWaive &&
+      (!Number.isFinite(amountDollars) || (amountDollars as number) < 0)
+    ) {
+      setError("Enter a valid trial price, or check Waive.");
+      return;
+    }
+
+    const whenLabel = `${formatSlotDay(start, TZ)} · ${formatSlotTime(start, TZ)}`;
+    const ok = await confirm("recordTrial", {
+      name: enrollment.name,
+      email: enrollment.email,
+      waived: trialWaive,
+      amountLabel: trialWaive ? undefined : `$${trialAmount}`,
+      whenLabel,
+    });
+    if (!ok) return;
+
+    setBusy("trial");
+    try {
+      const result = await recordTrialForStudent(
+        {
+          enrollmentId: enrollment.id,
+          start,
+          end,
+          format: trialFormat,
+          durationMinutes: trialDuration,
+          amountDollars: trialWaive ? undefined : amountDollars,
+          waive: trialWaive,
+          markPaid: trialWaive ? true : trialMarkPaid,
+          sendEmail: trialSendEmail,
+        },
+        token
+      );
+      setTrialSummary(result.summary);
+      setPayload(await loadStudio({ includePrivate: true }));
+      setBusy("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not record trial.");
       setBusy("");
     }
   };
@@ -489,6 +563,134 @@ const AdminStudentDetail: React.FC = () => {
                   </div>
                 ) : null}
               </dl>
+            </section>
+          ) : null}
+
+          {section === "trial" ? (
+            <section className="border border-line bg-white px-5 py-5 space-y-4">
+              <h2 className="font-display text-2xl">Record trial lesson</h2>
+              <p className="text-sm text-muted max-w-xl">
+                Attach a trial to this existing account — including past dates —
+                so it appears on their schedule and payment history. Does not
+                change their weekly lesson slot when they already have one. No
+                email unless you check the option below.
+              </p>
+              <form onSubmit={onRecordTrial} className="space-y-4 max-w-xl">
+                <label className="text-sm block">
+                  <span className="text-muted text-xs uppercase tracking-wider">
+                    Trial date &amp; time
+                  </span>
+                  <input
+                    type="datetime-local"
+                    className="admin-input mt-1"
+                    value={trialLocal}
+                    onChange={(e) => setTrialLocal(e.target.value)}
+                    required
+                  />
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <label className="text-sm block">
+                    <span className="text-muted text-xs uppercase tracking-wider">
+                      Length
+                    </span>
+                    <select
+                      className="admin-input mt-1"
+                      value={trialDuration}
+                      onChange={(e) =>
+                        setTrialDuration(Number(e.target.value) as 30 | 45)
+                      }
+                    >
+                      <option value={30}>30 min</option>
+                      <option value={45}>45 min</option>
+                    </select>
+                  </label>
+                  <label className="text-sm block">
+                    <span className="text-muted text-xs uppercase tracking-wider">
+                      Format
+                    </span>
+                    <select
+                      className="admin-input mt-1"
+                      value={trialFormat}
+                      onChange={(e) =>
+                        setTrialFormat(e.target.value as LessonFormat)
+                      }
+                    >
+                      <option value="in_person">In person</option>
+                      <option value="online">Online</option>
+                    </select>
+                  </label>
+                  <label className="text-sm block">
+                    <span className="text-muted text-xs uppercase tracking-wider">
+                      Price ($)
+                    </span>
+                    <input
+                      className="admin-input mt-1"
+                      inputMode="decimal"
+                      value={trialAmount}
+                      onChange={(e) => setTrialAmount(e.target.value)}
+                      disabled={trialWaive}
+                      placeholder="35"
+                    />
+                  </label>
+                </div>
+                <label className="flex items-start gap-3 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={trialWaive}
+                    onChange={(e) => setTrialWaive(e.target.checked)}
+                  />
+                  <span>
+                    <span className="font-medium">Waive trial fee</span>
+                    <span className="block text-muted text-xs mt-0.5">
+                      Record as complimentary ($0) in payment history.
+                    </span>
+                  </span>
+                </label>
+                {!trialWaive ? (
+                  <label className="flex items-start gap-3 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={trialMarkPaid}
+                      onChange={(e) => setTrialMarkPaid(e.target.checked)}
+                    />
+                    <span>
+                      <span className="font-medium">Mark as paid</span>
+                      <span className="block text-muted text-xs mt-0.5">
+                        For past / cash / already collected. Uncheck to create a
+                        Stripe pay link instead.
+                      </span>
+                    </span>
+                  </label>
+                ) : null}
+                <label className="flex items-start gap-3 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={trialSendEmail}
+                    onChange={(e) => setTrialSendEmail(e.target.checked)}
+                  />
+                  <span>
+                    <span className="font-medium">Also send email</span>
+                    <span className="block text-muted text-xs mt-0.5">
+                      Optional — leave off when backfilling a past lesson.
+                    </span>
+                  </span>
+                </label>
+                {trialSummary ? (
+                  <p className="text-sm border border-line bg-paper-muted/40 px-3 py-2">
+                    {trialSummary}
+                  </p>
+                ) : null}
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={busy === "trial"}
+                >
+                  {busy === "trial" ? "Saving…" : "Record trial"}
+                </button>
+              </form>
             </section>
           ) : null}
 

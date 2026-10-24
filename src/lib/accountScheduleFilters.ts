@@ -44,7 +44,8 @@ export function filterSchedule<T extends ScheduleFilterRow>(
     if (from && key < from) return false;
     if (to && key > to) return false;
 
-    if (kind === "lessons" && row.type !== "lesson") return false;
+    if (kind === "lessons" && row.type !== "lesson" && row.type !== "trial")
+      return false;
     if (kind === "closed" && !isStudioClosedType(row.type)) return false;
 
     return true;

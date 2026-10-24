@@ -523,9 +523,52 @@ async function confirmTrialFromSession(env, payload, session) {
 
   if (!booking) return { payload, booking: null };
 
+  const alreadyPaid = (payload.payments || []).some(
+    (p) =>
+      p.bookingId === bookingId ||
+      (p.kind === "trial" &&
+        p.stripeSessionId &&
+        p.stripeSessionId === session.id)
+  );
+  const trialPay = alreadyPaid
+    ? null
+    : {
+        id: newId("pay"),
+        enrollmentId: booking.enrollmentId || "",
+        bookingId,
+        kind: "trial",
+        amountCents:
+          typeof booking.amountCents === "number"
+            ? booking.amountCents
+            : typeof session.amount_total === "number"
+              ? session.amount_total
+              : 0,
+        status: "paid",
+        stripeSessionId: session.id,
+        periodKey: null,
+        paidAt: booking.paidAt || new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      };
+
+  const enrollments = (payload.enrollments || []).map((e) => {
+    if (!booking.enrollmentId || e.id !== booking.enrollmentId) return e;
+    if (e.inviteKind !== "trial" && e.trialBookingId !== bookingId) return e;
+    return {
+      ...e,
+      amountDueCents: 0,
+      pendingCheckoutSessionId: "",
+      pendingCheckoutMode: "",
+      updatedAt: new Date().toISOString(),
+    };
+  });
+
   let next = {
     ...payload,
     bookings,
+    enrollments,
+    payments: trialPay
+      ? [trialPay, ...(payload.payments || [])].slice(0, 500)
+      : payload.payments || [],
     updatedAt: new Date().toISOString(),
   };
   await writePayload(env, next);

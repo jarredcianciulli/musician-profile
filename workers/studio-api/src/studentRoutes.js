@@ -27,6 +27,7 @@ import {
   refreshEnrollmentDue,
   sha256Hex,
   buildSchedule,
+  mergeScheduleWithBookings,
   buildBillingItems,
   periodKeyFromDate,
   nextMonthStartIso,
@@ -66,7 +67,12 @@ function accountPath(env, suffix = "") {
 
 function portalPayload(enrollment, payload) {
   const months = enrollment.scheduleMonths || 12;
-  const schedule = buildSchedule(enrollment, payload.holidays, months);
+  const weekly = buildSchedule(enrollment, payload.holidays, months);
+  const schedule = mergeScheduleWithBookings(
+    weekly,
+    enrollment,
+    payload.bookings
+  );
   const payments = (payload.payments || [])
     .filter(
       (p) =>
@@ -299,10 +305,28 @@ export async function handleStudentRoutes({
         )
       : [...(payload.enrollments || []), enrollment];
 
+    const trialPayment = waived
+      ? {
+          id: newId("pay"),
+          enrollmentId: enrollment.id,
+          bookingId,
+          kind: "trial",
+          amountCents: 0,
+          status: "paid",
+          periodKey: null,
+          paidAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          note: "waived",
+        }
+      : null;
+
     payload = {
       ...payload,
       enrollments,
       bookings: [...(payload.bookings || []), booking],
+      payments: trialPayment
+        ? [trialPayment, ...(payload.payments || [])].slice(0, 500)
+        : payload.payments || [],
       updatedAt: new Date().toISOString(),
     };
     await writePayload(env, payload);
@@ -429,6 +453,289 @@ export async function handleStudentRoutes({
           : waived
             ? `Complimentary trial invite sent to ${email}.`
             : `Trial invite ($${amountDollars}) sent to ${email} with Stripe pay link.`,
+      },
+      200,
+      origin
+    );
+  }
+
+  // ——— Admin: record trial on existing account (past OK, no email by default) ———
+  if (request.method === "POST" && route === "/studio/students/record-trial") {
+    if (!adminOk()) return json({ error: "Unauthorized" }, 401, origin);
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ error: "Invalid JSON" }, 400, origin);
+    }
+    const enrollmentId = String(body?.enrollmentId || "").trim();
+    const start = String(body?.start || "").trim();
+    const end = String(body?.end || "").trim();
+    const format = body?.format === "online" ? "online" : "in_person";
+    const mins = Number(body?.durationMinutes) === 45 ? 45 : 30;
+    const waived = Boolean(body?.waive);
+    const markPaid = body?.markPaid !== false; // default paid/recorded
+    const sendEmail = Boolean(body?.sendEmail);
+    const amountRaw = body?.amountDollars;
+    const amountDollars =
+      amountRaw === undefined || amountRaw === null || String(amountRaw).trim() === ""
+        ? 35
+        : Number(amountRaw);
+
+    if (!enrollmentId || !start || !end) {
+      return json(
+        { error: "enrollmentId, start, and end are required." },
+        400,
+        origin
+      );
+    }
+    if (!waived && (!Number.isFinite(amountDollars) || amountDollars < 0 || amountDollars > 500)) {
+      return json(
+        { error: "amountDollars must be between 0 and 500 (or waive)." },
+        400,
+        origin
+      );
+    }
+    if (!waived && amountDollars === 0) {
+      return json(
+        { error: "Use waive for a free trial, or set a price greater than 0." },
+        400,
+        origin
+      );
+    }
+
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      return json({ error: "Invalid start or end datetime." }, 400, origin);
+    }
+
+    let payload = await readPayload(env);
+    const existing = (payload.enrollments || []).find((e) => e.id === enrollmentId);
+    if (!existing || existing.status === "cancelled") {
+      return json({ error: "Student not found." }, 404, origin);
+    }
+
+    const amountCents = waived ? 0 : Math.round(amountDollars * 100);
+    const isPast = endDate.getTime() < Date.now();
+    const paidNow = waived || markPaid;
+    const bookingId = newId("booking");
+    const booking = {
+      id: bookingId,
+      start,
+      end,
+      name: existing.name,
+      email: existing.email,
+      notes: waived
+        ? "admin_record_trial_waived"
+        : paidNow
+          ? "admin_record_trial_paid"
+          : "admin_record_trial",
+      lessonType: "trial",
+      format,
+      durationMinutes: mins,
+      status: paidNow ? "scheduled" : "pending_payment",
+      amountCents,
+      paidAt: paidNow ? new Date().toISOString() : undefined,
+      enrollmentId: existing.id,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Do not overwrite weekly slot / billing for active or subscription students.
+    const protectSlot =
+      existing.status === "active" ||
+      Boolean(existing.stripeSubscriptionId) ||
+      existing.inviteKind === "subscription" ||
+      Boolean(existing.paidThroughPeriodKey);
+
+    let enrollment = protectSlot
+      ? {
+          ...existing,
+          trialBookingId: existing.trialBookingId || bookingId,
+          updatedAt: new Date().toISOString(),
+        }
+      : {
+          ...existing,
+          slotStart: start,
+          slotEnd: end,
+          durationMinutes: mins,
+          format,
+          weekday: weekdayFromDate(startDate) ?? existing.weekday,
+          inviteKind: existing.inviteKind || "trial",
+          trialBookingId: bookingId,
+          trialWaived: waived,
+          amountDueCents: paidNow ? 0 : amountCents,
+          amountDueLocked: !paidNow,
+          status: existing.status === "active" ? "active" : "invited",
+          updatedAt: new Date().toISOString(),
+        };
+
+    const trialPayment = paidNow
+      ? {
+          id: newId("pay"),
+          enrollmentId: enrollment.id,
+          bookingId,
+          kind: "trial",
+          amountCents,
+          status: "paid",
+          periodKey: null,
+          paidAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          note: waived ? "waived" : "recorded",
+        }
+      : null;
+
+    payload = {
+      ...payload,
+      enrollments: (payload.enrollments || []).map((e) =>
+        e.id === enrollment.id ? enrollment : e
+      ),
+      bookings: [...(payload.bookings || []), booking],
+      payments: trialPayment
+        ? [trialPayment, ...(payload.payments || [])].slice(0, 500)
+        : payload.payments || [],
+      updatedAt: new Date().toISOString(),
+    };
+    await writePayload(env, payload);
+
+    let checkoutUrl = "";
+    let magicUrl = "";
+    let emailWarning = "";
+
+    if (!paidNow && env.STRIPE_SECRET_KEY) {
+      try {
+        const base = siteBase(env);
+        const session = await createTrialCheckoutSession(env, {
+          bookingId,
+          email: enrollment.email,
+          name: enrollment.name,
+          amountCents,
+          durationMinutes: mins,
+          successUrl: `${base}/trial?success=1&session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: accountPath(env, "/canceled"),
+          metadata: {
+            type: "trial",
+            bookingId,
+            enrollmentId: enrollment.id,
+            format,
+            source: "admin_record_trial",
+          },
+        });
+        checkoutUrl = session.url || "";
+        enrollment = {
+          ...enrollment,
+          pendingCheckoutSessionId: session.id,
+          pendingCheckoutMode: "trial",
+          updatedAt: new Date().toISOString(),
+        };
+        payload = {
+          ...payload,
+          enrollments: (payload.enrollments || []).map((e) =>
+            e.id === enrollment.id ? enrollment : e
+          ),
+          bookings: (payload.bookings || []).map((b) =>
+            b.id === bookingId ? { ...b, stripeSessionId: session.id } : b
+          ),
+          updatedAt: new Date().toISOString(),
+        };
+        await writePayload(env, payload);
+      } catch (err) {
+        return json(
+          {
+            error:
+              err instanceof Error
+                ? err.message
+                : "Could not create Stripe Checkout for the trial.",
+            enrollment: publicEnrollment(enrollment),
+          },
+          502,
+          origin
+        );
+      }
+    }
+
+    if (sendEmail) {
+      try {
+        const issued = await issueMagicLink(enrollment);
+        enrollment = issued.enrollment;
+        magicUrl = accountPath(env, `?token=${issued.token}`);
+        payload = {
+          ...payload,
+          enrollments: (payload.enrollments || []).map((e) =>
+            e.id === enrollment.id ? enrollment : e
+          ),
+          updatedAt: new Date().toISOString(),
+        };
+        await writePayload(env, payload);
+
+        const whenLabel = (() => {
+          try {
+            const d = new Date(start);
+            const day = new Intl.DateTimeFormat("en-US", {
+              timeZone: "America/New_York",
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            }).format(d);
+            const time = new Intl.DateTimeFormat("en-US", {
+              timeZone: "America/New_York",
+              hour: "numeric",
+              minute: "2-digit",
+            }).format(d);
+            return `${day} at ${time}`;
+          } catch {
+            return start;
+          }
+        })();
+
+        const sent = await sendTrialInviteEmail(
+          env,
+          {
+            name: enrollment.name,
+            email: enrollment.email,
+            magicUrl,
+            whenLabel,
+            format,
+            durationMinutes: mins,
+            amountCents,
+            waived,
+            checkoutUrl: paidNow ? "" : checkoutUrl,
+            enrollmentId: enrollment.id,
+          },
+          payload
+        );
+        if (sent.payload) {
+          payload = sent.payload;
+          await writePayload(env, payload);
+        }
+      } catch (err) {
+        if (err && err.payload) {
+          payload = err.payload;
+          await writePayload(env, payload);
+        }
+        emailWarning =
+          err instanceof Error ? err.message : "Trial email failed";
+      }
+    }
+
+    const dollarsLabel = waived
+      ? "complimentary"
+      : `$${(amountCents / 100).toFixed(amountCents % 100 === 0 ? 0 : 2)}`;
+    const whenHint = isPast ? " (past)" : "";
+
+    return json(
+      {
+        enrollment: publicEnrollment(enrollment),
+        booking,
+        checkoutUrl: checkoutUrl || undefined,
+        magicUrl: magicUrl || undefined,
+        emailWarning: emailWarning || undefined,
+        summary: emailWarning
+          ? `Trial recorded for ${enrollment.email}${whenHint}, but email failed (${emailWarning}).`
+          : sendEmail
+            ? `Trial recorded and emailed to ${enrollment.email}${whenHint} · ${dollarsLabel}.`
+            : `Trial recorded on ${enrollment.name}'s account${whenHint} · ${dollarsLabel}. Shows on their schedule and payment history.`,
       },
       200,
       origin

@@ -177,6 +177,67 @@ export function buildSchedule(enrollment, holidays = [], months) {
   return out;
 }
 
+/**
+ * Merge one-off trial (and similar) bookings into the weekly schedule timeline.
+ * Does not overwrite weekly slot expansion — adds / labels trial rows.
+ */
+export function mergeScheduleWithBookings(schedule, enrollment, bookings = []) {
+  if (!enrollment?.id) return schedule || [];
+  const rows = [...(schedule || [])];
+  const linked = (bookings || []).filter(
+    (b) =>
+      b &&
+      b.enrollmentId === enrollment.id &&
+      b.lessonType === "trial" &&
+      b.status !== "cancelled"
+  );
+
+  for (const b of linked) {
+    if (!b.start) continue;
+    const startMs = new Date(b.start).getTime();
+    if (Number.isNaN(startMs)) continue;
+    const endIso =
+      b.end ||
+      new Date(
+        startMs + (b.durationMinutes || enrollment.durationMinutes || 30) * 60 * 1000
+      ).toISOString();
+    const ended = new Date(endIso).getTime() < Date.now();
+    const status =
+      b.status === "pending_payment"
+        ? "pending_payment"
+        : ended
+          ? "completed"
+          : "scheduled";
+
+    const nearIdx = rows.findIndex((r) => {
+      if (!r?.start) return false;
+      if (r.type !== "lesson" && r.type !== "trial") return false;
+      return Math.abs(new Date(r.start).getTime() - startMs) < 2 * 60 * 1000;
+    });
+
+    const trialRow = {
+      type: "trial",
+      start: b.start,
+      end: endIso,
+      title: "Trial lesson",
+      status,
+      bookingId: b.id,
+      amountCents: typeof b.amountCents === "number" ? b.amountCents : undefined,
+    };
+
+    if (nearIdx >= 0) {
+      rows[nearIdx] = { ...rows[nearIdx], ...trialRow };
+    } else {
+      rows.push(trialRow);
+    }
+  }
+
+  rows.sort(
+    (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
+  );
+  return rows;
+}
+
 /** @deprecated use buildSchedule */
 export function upcomingLessons(enrollment, holidays = [], count = 8) {
   return buildSchedule(enrollment, holidays, Math.ceil(count / 4)).filter(

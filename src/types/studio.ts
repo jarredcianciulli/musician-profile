@@ -44,7 +44,7 @@ export type AvailabilityConfig = {
   durationsMinutes: number[];
   /** Default duration preselected in the booking form */
   defaultDurationMinutes: number;
-  /** Hide slots that start sooner than this many hours from now */
+  /** Hide public slots that start sooner than this many hours from now (fractional OK; Admin can edit as hours or days) */
   minLeadHours?: number;
   weeklyHours: DayHours[];
 };
@@ -188,13 +188,15 @@ export type StudentEnrollment = {
 export type StudentPayment = {
   id: string;
   enrollmentId: string;
-  kind: "proration" | "monthly" | "subscription_setup" | string;
+  kind: "proration" | "monthly" | "subscription_setup" | "trial" | string;
   amountCents: number;
   status: "pending" | "paid" | string;
   stripeSessionId?: string;
+  bookingId?: string;
   periodKey?: string;
   paidAt?: string;
   createdAt?: string;
+  note?: string;
 };
 
 /** Outbound transactional email log (admin-visible). */

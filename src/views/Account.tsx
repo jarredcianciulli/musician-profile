@@ -49,6 +49,8 @@ function statusLabel(status: string) {
       return "Scheduled";
     case "completed":
       return "Completed";
+    case "pending_payment":
+      return "Payment pending";
     case "holiday":
       return "Holiday";
     case "break":
@@ -725,9 +727,11 @@ const Account: React.FC = () => {
                             <td className="px-3 py-2 capitalize">
                               {row.type === "lesson"
                                 ? "Lesson"
-                                : row.type === "break"
-                                  ? "Break"
-                                  : "Holiday"}
+                                : row.type === "trial"
+                                  ? "Trial"
+                                  : row.type === "break"
+                                    ? "Break"
+                                    : "Holiday"}
                             </td>
                             <td className="px-3 py-2 text-ink-soft">
                               {isOff
@@ -994,7 +998,13 @@ const Account: React.FC = () => {
                   className="px-4 py-2.5 flex justify-between gap-2"
                 >
                   <span className="text-ink-soft">
-                    {p.kind}
+                    {p.kind === "trial"
+                      ? "Trial lesson"
+                      : p.kind === "proration"
+                        ? "First period"
+                        : p.kind === "monthly"
+                          ? "Monthly tuition"
+                          : p.kind}
                     {p.periodKey ? ` · ${p.periodKey}` : ""}
                   </span>
                   <span>{formatMoney(p.amountCents)}</span>

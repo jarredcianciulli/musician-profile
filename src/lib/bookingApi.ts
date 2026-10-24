@@ -323,7 +323,7 @@ export function clearAccountSessionToken() {
 }
 
 export type AccountScheduleRow = {
-  type: "lesson" | "holiday" | "break" | string;
+  type: "lesson" | "trial" | "holiday" | "break" | string;
   start: string;
   end?: string;
   title?: string;
@@ -509,6 +509,48 @@ export async function inviteTrialStudent(
     throw new Error(data.error || "Could not send trial invite.");
   }
   return data as TrialInviteResult;
+}
+
+export type RecordTrialResult = {
+  enrollment: StudentEnrollment;
+  booking?: Record<string, unknown>;
+  checkoutUrl?: string;
+  magicUrl?: string;
+  summary: string;
+  emailWarning?: string;
+};
+
+/** Admin: attach a trial lesson to an existing account (past OK; schedule + billing). */
+export async function recordTrialForStudent(
+  input: {
+    enrollmentId: string;
+    start: string;
+    end: string;
+    format?: LessonFormat;
+    durationMinutes?: 30 | 45;
+    amountDollars?: number;
+    waive?: boolean;
+    /** Default true — mark paid without Stripe (typical for past lessons). */
+    markPaid?: boolean;
+    /** Optional: also email invite / pay link. Default false. */
+    sendEmail?: boolean;
+  },
+  adminToken: string
+): Promise<RecordTrialResult> {
+  if (!apiBase) throw new Error("Record trial requires the studio API.");
+  const res = await fetch(`${apiBase}/studio/students/record-trial`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${adminToken}`,
+    },
+    body: JSON.stringify(input),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not record trial.");
+  }
+  return data as RecordTrialResult;
 }
 
 export async function inviteStudent(
