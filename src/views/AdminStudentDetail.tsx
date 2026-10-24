@@ -14,6 +14,7 @@ import { nextLessonStartIso } from "../lib/studentSchedule";
 import { grantStudentEditAccess } from "../lib/adminStudentEditGate";
 import {
   cancelStudentInvite,
+  impersonateStudent,
   resendStudentMagicLink,
 } from "../lib/bookingApi";
 import type {
@@ -131,6 +132,30 @@ const AdminStudentDetail: React.FC = () => {
       router.push("/admin");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Cancel failed.");
+      setBusy("");
+    }
+  };
+
+  const onOpenAsStudent = async () => {
+    const token = getAdminToken();
+    if (!token || !enrollment) return;
+    if (
+      !window.confirm(
+        `Open ${enrollment.name}’s student portal? This creates a one-time link (15 min) and notifies Slack.`
+      )
+    ) {
+      return;
+    }
+    setBusy("impersonate");
+    setError("");
+    try {
+      const result = await impersonateStudent(enrollment.id, token);
+      window.open(result.url, "_blank", "noopener,noreferrer");
+      setBusy("");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not open student portal."
+      );
       setBusy("");
     }
   };
@@ -255,6 +280,14 @@ const AdminStudentDetail: React.FC = () => {
           ) : null}
 
           <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn-primary text-xs"
+              disabled={busy === "impersonate"}
+              onClick={onOpenAsStudent}
+            >
+              {busy === "impersonate" ? "Opening…" : "Open as student"}
+            </button>
             <button
               type="button"
               className="btn-secondary text-xs"

@@ -112,6 +112,7 @@ npx wrangler secret put GOOGLE_PRIVATE_KEY
 npx wrangler secret put STRIPE_SECRET_KEY
 npx wrangler secret put STRIPE_WEBHOOK_SECRET
 npx wrangler secret put BREVO_API_KEY   # booking + lead emails (same key as contact worker)
+npx wrangler secret put SLACK_WEBHOOK_URL   # Incoming Webhook — student login + admin portal alerts
 npx wrangler deploy
 ```
 
@@ -134,6 +135,7 @@ npx wrangler secret put STRIPE_SECRET_KEY --env staging      # sk_test_…
 npx wrangler secret put STRIPE_WEBHOOK_SECRET --env staging
 npx wrangler secret put BREVO_API_KEY --env staging
 npx wrangler secret put ADMIN_TOKEN --env staging
+npx wrangler secret put SLACK_WEBHOOK_URL --env staging   # optional; same or separate channel
 npx wrangler deploy --env staging
 ```
 

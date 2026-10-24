@@ -10,6 +10,7 @@ import {
 } from "./stripe.js";
 import { computeProration, weekdayFromDate } from "./proration.js";
 import { sendStudentInviteEmail, sendSubscriptionBookedEmails } from "./mailers.js";
+import { notifySlack } from "./slack.js";
 import {
   findEnrollmentByEmail,
   findEnrollmentByMagicHash,
@@ -27,6 +28,8 @@ import {
   publicPayments,
 } from "./students.js";
 import { appendReturnQuery, sanitizeReturnQuery } from "./returnQuery.js";
+
+const IMPERSONATE_TTL_MS = 15 * 60 * 1000;
 
 function newId(prefix) {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -574,6 +577,53 @@ export async function handleStudentRoutes({
     return json({ ok: true, enrollment: toSave }, 200, origin);
   }
 
+  // ——— Admin: open student portal (short-lived one-time link) ———
+  if (request.method === "POST" && route === "/studio/students/impersonate") {
+    if (!adminOk()) return json({ error: "Unauthorized" }, 401, origin);
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ error: "Invalid JSON" }, 400, origin);
+    }
+    const enrollmentId = String(body?.enrollmentId || "").trim();
+    if (!enrollmentId) {
+      return json({ error: "enrollmentId required." }, 400, origin);
+    }
+    let payload = await readPayload(env);
+    let enrollment = (payload.enrollments || []).find((e) => e.id === enrollmentId);
+    if (!enrollment) return json({ error: "Enrollment not found" }, 404, origin);
+    if (enrollment.status === "cancelled") {
+      return json({ error: "Cannot open a cancelled invite." }, 400, origin);
+    }
+
+    const issued = await issueMagicLink(enrollment);
+    enrollment = {
+      ...issued.enrollment,
+      magicExpiresAt: new Date(Date.now() + IMPERSONATE_TTL_MS).toISOString(),
+      pendingLoginSource: "admin_impersonation",
+      updatedAt: new Date().toISOString(),
+    };
+    payload = updateEnrollment(payload, enrollment);
+    await writePayload(env, payload);
+
+    const magicUrl = accountPath(env, `?token=${issued.token}`);
+    // Soft notify — link created (actual portal entry also notifies on exchange)
+    await notifySlack(
+      env,
+      `🔑 Admin created a portal link for *${enrollment.name}* (${enrollment.email}). Expires in 15 minutes.`
+    );
+    return json(
+      {
+        ok: true,
+        url: magicUrl,
+        expiresInSeconds: Math.floor(IMPERSONATE_TTL_MS / 1000),
+      },
+      200,
+      origin
+    );
+  }
+
   // ——— Magic link exchange ———
   if (request.method === "GET" && route === "/studio/account/session") {
     const token = url.searchParams.get("token") || "";
@@ -584,14 +634,38 @@ export async function handleStudentRoutes({
     if (!enrollment) {
       return json({ error: "Invalid or expired link." }, 401, origin);
     }
+    const loginSource =
+      enrollment.pendingLoginSource === "admin_impersonation"
+        ? "admin_impersonation"
+        : "magic_link";
     const issued = await issueSession(enrollment);
     enrollment = refreshEnrollmentDue(
-      issued.enrollment,
+      {
+        ...issued.enrollment,
+        pendingLoginSource: "",
+        lastLoginAt: new Date().toISOString(),
+        lastLoginSource: loginSource,
+      },
       payload.availability?.weeklyHours
     );
     delete enrollment._proration;
     payload = updateEnrollment(payload, enrollment);
     await writePayload(env, payload);
+
+    const when = new Date().toLocaleString("en-US", {
+      timeZone: "America/New_York",
+    });
+    if (loginSource === "admin_impersonation") {
+      await notifySlack(
+        env,
+        `👁️ Admin opened *${enrollment.name}*’s account (${enrollment.email}) · ${when}`
+      );
+    } else {
+      await notifySlack(
+        env,
+        `🔔 *${enrollment.name}* signed in to their account (${enrollment.email}) · ${when}`
+      );
+    }
 
     return json(
       {

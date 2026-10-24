@@ -571,6 +571,27 @@ export async function cancelStudentInvite(
   return data as { ok: boolean; enrollment: StudentEnrollment };
 }
 
+/** Admin: short-lived one-time URL to open the student portal as them. */
+export async function impersonateStudent(
+  enrollmentId: string,
+  adminToken: string
+): Promise<{ ok: boolean; url: string; expiresInSeconds: number }> {
+  if (!apiBase) throw new Error("Requires the studio API.");
+  const res = await fetch(`${apiBase}/studio/students/impersonate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${adminToken}`,
+    },
+    body: JSON.stringify({ enrollmentId }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not open student portal.");
+  }
+  return data as { ok: boolean; url: string; expiresInSeconds: number };
+}
+
 /** Admin: update enrollment fields (detail edit page). */
 export async function updateStudentEnrollment(
   enrollmentId: string,
