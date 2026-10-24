@@ -373,6 +373,8 @@ export type StudentInviteResult = {
   enrollment: StudentEnrollment;
   magicUrl: string;
   summary: string;
+  /** Present when Brevo failed but enrollment + link were still created */
+  emailWarning?: string;
 };
 
 export async function inviteStudent(

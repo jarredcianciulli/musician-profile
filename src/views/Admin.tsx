@@ -904,9 +904,16 @@ const Admin: React.FC = () => {
             {inviteResult ? (
               <div className="border border-line bg-paper-muted/40 px-4 py-3 space-y-3 text-sm">
                 <p className="text-ink-soft">{inviteResult.summary}</p>
+                {inviteResult.emailWarning ? (
+                  <p className="text-accent text-xs" role="alert">
+                    Email: {inviteResult.emailWarning}
+                  </p>
+                ) : null}
                 <div>
                   <p className="text-xs uppercase tracking-wider text-muted mb-1">
-                    Magic link (also emailed)
+                    {inviteResult.emailWarning
+                      ? "Magic link (email failed — copy & send manually)"
+                      : "Magic link (also emailed)"}
                   </p>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <input

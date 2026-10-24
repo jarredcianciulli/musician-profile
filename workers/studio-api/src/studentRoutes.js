@@ -174,6 +174,7 @@ export async function handleStudentRoutes({
     await writePayload(env, payload);
 
     const magicUrl = `${siteBase(env)}/account?token=${issued.token}`;
+    let emailWarning = "";
     try {
       await sendStudentInviteEmail(env, {
         name,
@@ -182,15 +183,10 @@ export async function handleStudentRoutes({
         billingMode: enrollment.billingMode,
       });
     } catch (err) {
-      return json(
-        {
-          error: err instanceof Error ? err.message : "Invite email failed",
-          enrollment: publicEnrollment(enrollment),
-          magicUrl,
-        },
-        502,
-        origin
-      );
+      // Enrollment + link are already saved — return them so Admin can copy.
+      emailWarning =
+        err instanceof Error ? err.message : "Invite email failed";
+      console.error("Invite email failed:", emailWarning);
     }
 
     const dueLabel = `$${(
@@ -200,7 +196,10 @@ export async function handleStudentRoutes({
       {
         enrollment: publicEnrollment(enrollment),
         magicUrl,
-        summary: `Invite sent to ${email} (${enrollment.billingMode}). Amount due now: ${dueLabel}.`,
+        emailWarning: emailWarning || undefined,
+        summary: emailWarning
+          ? `Enrollment saved for ${email}, but email failed (${emailWarning}). Copy the magic link below.`
+          : `Invite sent to ${email} (${enrollment.billingMode}). Amount due now: ${dueLabel}.`,
       },
       200,
       origin
