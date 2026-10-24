@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { PublicShell } from "@/components/PublicShell";
+import { AccountShell } from "@/components/AccountShell";
 import Account from "@/views/Account";
 
 export const metadata: Metadata = {
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function AccountPage() {
   return (
-    <PublicShell>
+    <AccountShell>
       <Suspense
         fallback={
           <div className="section-container py-20 max-w-lg">
@@ -20,6 +20,6 @@ export default function AccountPage() {
       >
         <Account />
       </Suspense>
-    </PublicShell>
+    </AccountShell>
   );
 }

@@ -8,6 +8,32 @@ export function siteUrl(): string {
   ).replace(/\/$/, "");
 }
 
+/** Marketing / public site (may differ from account portal host). */
+export function marketingSiteUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_MARKETING_DOMAIN ||
+    siteUrl()
+  ).replace(/\/$/, "");
+}
+
+/**
+ * Student portal base URL.
+ * Prefer NEXT_PUBLIC_ACCOUNT_DOMAIN (e.g. https://account.batterystringstudio.com).
+ * Falls back to /account on the marketing site until DNS is live.
+ */
+export function accountPortalUrl(): string {
+  const dedicated = (
+    process.env.NEXT_PUBLIC_ACCOUNT_DOMAIN || ""
+  ).replace(/\/$/, "");
+  if (dedicated) return dedicated;
+  return `${siteUrl()}/account`;
+}
+
+export function isAccountHost(hostname: string): boolean {
+  const h = (hostname || "").toLowerCase().split(":")[0];
+  return h.startsWith("account.") || h.startsWith("account-staging.");
+}
+
 export function studioApiBase(): string {
   return (process.env.NEXT_PUBLIC_STUDIO_API || "").replace(/\/$/, "");
 }

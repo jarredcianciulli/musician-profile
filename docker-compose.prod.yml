@@ -9,6 +9,8 @@ services:
         NEXT_PUBLIC_CONTACT_ENDPOINT: ${NEXT_PUBLIC_CONTACT_ENDPOINT:-https://api.jarredcianciulli.com/contact}
         NEXT_PUBLIC_STUDIO_API: ${NEXT_PUBLIC_STUDIO_API:-https://booking-api.batterystringstudio.com}
         NEXT_PUBLIC_WEBSITE_DOMAIN: ${NEXT_PUBLIC_WEBSITE_DOMAIN:-https://batterystringstudio.com}
+        NEXT_PUBLIC_ACCOUNT_DOMAIN: ${NEXT_PUBLIC_ACCOUNT_DOMAIN:-https://account.batterystringstudio.com}
+        NEXT_PUBLIC_MARKETING_DOMAIN: ${NEXT_PUBLIC_MARKETING_DOMAIN:-https://batterystringstudio.com}
         NEXT_PUBLIC_LAB_URL: ${NEXT_PUBLIC_LAB_URL:-https://lab.batterystringstudio.com}
         NEXT_PUBLIC_METHOD_URL: ${NEXT_PUBLIC_METHOD_URL:-https://method.batterystringstudio.com}
         NEXT_PUBLIC_STUDIO_EMAIL: ${NEXT_PUBLIC_STUDIO_EMAIL:-jarred@batterystringstudio.com}

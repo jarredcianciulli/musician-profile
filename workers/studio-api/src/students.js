@@ -74,62 +74,174 @@ export function isHoliday(dateIso, holidays, timeZone = TIME_ZONE) {
   );
 }
 
-/** Next N weekly lesson occurrences from enrollment slot. */
-export function upcomingLessons(enrollment, holidays = [], count = 8) {
+export function holidayCovering(dateIso, holidays, timeZone = TIME_ZONE) {
+  const p = zonedParts(new Date(dateIso), timeZone);
+  const key = `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+  return (holidays || []).find(
+    (h) => h.startDate && h.endDate && key >= h.startDate && key <= h.endDate
+  );
+}
+
+function holidayKind(holiday) {
+  const title = String(holiday?.title || "");
+  if (/break/i.test(title)) return "break";
+  return "holiday";
+}
+
+function slotOnDay(year, month, day, slotParts) {
+  for (let h = 0; h < 48; h++) {
+    const candidate = new Date(
+      Date.UTC(year, month - 1, day, h, slotParts.minute, 0)
+    );
+    const cp = zonedParts(candidate, TIME_ZONE);
+    if (
+      cp.year === year &&
+      cp.month === month &&
+      cp.day === day &&
+      cp.hour === slotParts.hour &&
+      cp.minute === slotParts.minute
+    ) {
+      return candidate;
+    }
+  }
+  return new Date(Date.UTC(year, month - 1, day, 16, slotParts.minute, 0));
+}
+
+/**
+ * Timeline of lessons + holiday/break rows for the enrolled weekday.
+ * @param {number} [months] horizon (default from enrollment.scheduleMonths or 12)
+ */
+export function buildSchedule(enrollment, holidays = [], months) {
   const tz = TIME_ZONE;
+  const horizonMonths = Math.min(
+    24,
+    Math.max(1, Number(months || enrollment.scheduleMonths || 12))
+  );
   const slot = new Date(enrollment.slotStart);
   const slotParts = zonedParts(slot, tz);
   const weekday = WEEKDAY_LABEL[slotParts.weekday];
   const durationMs = (enrollment.durationMinutes || 45) * 60 * 1000;
   const out = [];
   const cursor = new Date();
-  // Walk day by day up to ~4 months
-  for (let i = 0; i < 130 && out.length < count; i++) {
+  const endMs = cursor.getTime() + horizonMonths * 31 * 24 * 60 * 60 * 1000;
+  const maxDays = horizonMonths * 32 + 14;
+
+  for (let i = 0; i < maxDays; i++) {
     const probe = new Date(cursor.getTime() + i * 24 * 60 * 60 * 1000);
+    if (probe.getTime() > endMs) break;
     const p = zonedParts(probe, tz);
     if (WEEKDAY_LABEL[p.weekday] !== weekday) continue;
-    // Build ISO for this calendar day at slot time in ET via UTC noon adjust
-    const approx = new Date(
-      Date.UTC(p.year, p.month - 1, p.day, 16, 0, 0)
-    );
-    const ap = zonedParts(approx, tz);
-    // Refine: create date string and parse — use slot hour/minute in TZ by offset guess
-    const startGuess = new Date(
-      Date.UTC(p.year, p.month - 1, p.day, 12, 0, 0)
-    );
-    // Iterate hours to match target local hour/minute
-    let start = null;
-    for (let h = 0; h < 48; h++) {
-      const candidate = new Date(
-        Date.UTC(p.year, p.month - 1, p.day, h, slotParts.minute, 0)
-      );
-      const cp = zonedParts(candidate, tz);
-      if (
-        cp.year === p.year &&
-        cp.month === p.month &&
-        cp.day === p.day &&
-        cp.hour === slotParts.hour &&
-        cp.minute === slotParts.minute
-      ) {
-        start = candidate;
-        break;
-      }
-    }
-    if (!start) {
-      start = startGuess;
-    }
-    if (start.getTime() + durationMs < Date.now() - 60 * 60 * 1000) {
-      // skip more than ~1h past
+
+    const start = slotOnDay(p.year, p.month, p.day, slotParts);
+    if (start.getTime() + durationMs < Date.now() - 60 * 60 * 1000) continue;
+
+    const covering = holidayCovering(start.toISOString(), holidays, tz);
+    if (covering) {
+      const kind = holidayKind(covering);
+      out.push({
+        type: kind,
+        start: start.toISOString(),
+        end: new Date(start.getTime() + durationMs).toISOString(),
+        title: covering.title || (kind === "break" ? "Studio break" : "Holiday"),
+        note: covering.publicNote || "",
+        holidayStart: covering.startDate,
+        holidayEnd: covering.endDate,
+        status: kind === "break" ? "break" : "holiday",
+      });
       continue;
     }
-    if (isHoliday(start.toISOString(), holidays, tz)) continue;
+
     out.push({
+      type: "lesson",
       start: start.toISOString(),
       end: new Date(start.getTime() + durationMs).toISOString(),
+      title: "Lesson",
       status: "scheduled",
     });
   }
   return out;
+}
+
+/** @deprecated use buildSchedule */
+export function upcomingLessons(enrollment, holidays = [], count = 8) {
+  return buildSchedule(enrollment, holidays, Math.ceil(count / 4)).filter(
+    (row) => row.type === "lesson"
+  );
+}
+
+const MONTHLY_RATES = { 30: 16000, 45: 22000, 60: 31000 };
+
+/**
+ * Read-only billing line items for the portal.
+ * status: paid | due | upcoming
+ */
+export function buildBillingItems(enrollment, payments = [], monthsAhead = 12) {
+  const rates = MONTHLY_RATES;
+  const monthly =
+    rates[enrollment.durationMinutes] || rates[45];
+  const now = new Date();
+  const currentKey = periodKeyFromDate(now);
+  const paidThrough = enrollment.paidThroughPeriodKey || null;
+  const items = [];
+  const horizon = Math.min(24, Math.max(1, Number(monthsAhead) || 12));
+
+  const p0 = zonedParts(now, TIME_ZONE);
+  for (let i = 0; i < horizon; i++) {
+    const y = p0.year + Math.floor((p0.month - 1 + i) / 12);
+    const m = ((p0.month - 1 + i) % 12) + 1;
+    const periodKey = `${y}-${String(m).padStart(2, "0")}`;
+    const ledger = (payments || []).find(
+      (pay) =>
+        pay.periodKey === periodKey &&
+        (pay.status === "paid" || pay.status === "pending")
+    );
+
+    let status = "upcoming";
+    let amountCents = monthly;
+    let label = "Monthly tuition";
+
+    if (paidThrough && periodKey <= paidThrough) {
+      status = "paid";
+      if (ledger) amountCents = ledger.amountCents || amountCents;
+    } else if (periodKey === currentKey) {
+      if ((enrollment.amountDueCents || 0) > 0) {
+        status = "due";
+        amountCents = enrollment.amountDueCents;
+        label = paidThrough ? "Monthly tuition" : "This period (proration)";
+      } else if (paidThrough === currentKey) {
+        status = "paid";
+      } else if (enrollment.billingMode === "auto" && enrollment.stripeSubscriptionId) {
+        status = "paid";
+        label = "Auto-charge (card on file)";
+      } else {
+        status = "upcoming";
+      }
+    } else if (periodKey < currentKey) {
+      // Past unpaid periods — skip clutter unless ledger has them
+      if (ledger?.status === "paid") {
+        status = "paid";
+        amountCents = ledger.amountCents || amountCents;
+      } else {
+        continue;
+      }
+    }
+
+    if (ledger?.status === "paid") {
+      status = "paid";
+      amountCents = ledger.amountCents || amountCents;
+    } else if (ledger?.status === "pending" && periodKey === currentKey) {
+      status = "due";
+    }
+
+    items.push({
+      periodKey,
+      label,
+      amountCents,
+      status,
+      paidAt: ledger?.paidAt || null,
+    });
+  }
+  return items;
 }
 
 export function publicEnrollment(enrollment) {
@@ -150,6 +262,7 @@ export function publicEnrollment(enrollment) {
     paidThroughPeriodKey: enrollment.paidThroughPeriodKey || null,
     nextDueAt: enrollment.nextDueAt || null,
     stripeSubscriptionId: enrollment.stripeSubscriptionId || "",
+    scheduleMonths: enrollment.scheduleMonths || 12,
     createdAt: enrollment.createdAt,
   };
 }

@@ -77,6 +77,23 @@ jobs:
             else
               echo "NEXT_PUBLIC_STUDIO_API=${STAGING_API}" >> "$ENV_FILE"
             fi
+            if grep -q "^NEXT_PUBLIC_ACCOUNT_DOMAIN=" "$ENV_FILE" 2>/dev/null; then
+              sed -i 's|^NEXT_PUBLIC_ACCOUNT_DOMAIN=.*|NEXT_PUBLIC_ACCOUNT_DOMAIN=https://account-staging.batterystringstudio.com|' "$ENV_FILE" || true
+            else
+              echo "NEXT_PUBLIC_ACCOUNT_DOMAIN=https://account-staging.batterystringstudio.com" >> "$ENV_FILE"
+            fi
+            if grep -q "^NEXT_PUBLIC_MARKETING_DOMAIN=" "$ENV_FILE" 2>/dev/null; then
+              sed -i 's|^NEXT_PUBLIC_MARKETING_DOMAIN=.*|NEXT_PUBLIC_MARKETING_DOMAIN=https://staging.batterystringstudio.com|' "$ENV_FILE" || true
+            else
+              echo "NEXT_PUBLIC_MARKETING_DOMAIN=https://staging.batterystringstudio.com" >> "$ENV_FILE"
+            fi
+          else
+            if ! grep -q "^NEXT_PUBLIC_ACCOUNT_DOMAIN=" "$ENV_FILE" 2>/dev/null; then
+              echo "NEXT_PUBLIC_ACCOUNT_DOMAIN=https://account.batterystringstudio.com" >> "$ENV_FILE"
+            fi
+            if ! grep -q "^NEXT_PUBLIC_MARKETING_DOMAIN=" "$ENV_FILE" 2>/dev/null; then
+              echo "NEXT_PUBLIC_MARKETING_DOMAIN=https://batterystringstudio.com" >> "$ENV_FILE"
+            fi
           fi
 
       - name: Build and start containers

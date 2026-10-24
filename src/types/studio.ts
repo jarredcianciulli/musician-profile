@@ -164,6 +164,8 @@ export type StudentEnrollment = {
   paidThroughPeriodKey?: string | null;
   nextDueAt?: string | null;
   stripeSubscriptionId?: string;
+  /** How far ahead the portal shows lessons (months). Default 12. */
+  scheduleMonths?: number;
   createdAt?: string;
 };
 

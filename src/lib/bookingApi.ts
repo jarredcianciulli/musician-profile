@@ -294,10 +294,30 @@ export function clearAccountSessionToken() {
   }
 }
 
+export type AccountScheduleRow = {
+  type: "lesson" | "holiday" | "break" | string;
+  start: string;
+  end?: string;
+  title?: string;
+  note?: string;
+  holidayStart?: string;
+  holidayEnd?: string;
+  status?: string;
+};
+
+export type AccountBillingItem = {
+  periodKey: string;
+  label: string;
+  amountCents: number;
+  status: "paid" | "due" | "upcoming" | string;
+  paidAt?: string | null;
+};
+
 export type AccountPortalData = {
   sessionToken?: string;
   enrollment: StudentEnrollment;
-  schedule: { start: string; end: string; status?: string }[];
+  schedule: AccountScheduleRow[];
+  billingItems?: AccountBillingItem[];
   payments: StudentPayment[];
 };
 
@@ -387,6 +407,8 @@ export async function inviteStudent(
     format?: LessonFormat;
     /** Admin-chosen path; default manual (pay by link). Auto kept for later. */
     billingMode?: "manual" | "auto";
+    /** Months of schedule to show / calendar-export. Default 12. */
+    scheduleMonths?: number;
   },
   adminToken: string
 ): Promise<StudentInviteResult> {

@@ -17,7 +17,8 @@ import {
   publicEnrollment,
   refreshEnrollmentDue,
   sha256Hex,
-  upcomingLessons,
+  buildSchedule,
+  buildBillingItems,
   periodKeyFromDate,
   nextMonthStartIso,
 } from "./students.js";
@@ -29,11 +30,34 @@ function newId(prefix) {
   return `${prefix}_${Date.now().toString(36)}`;
 }
 
+/** Marketing site (emails / admin links). */
 function siteBase(env) {
   return (env.WEBSITE_DOMAIN || "https://batterystringstudio.com").replace(
     /\/$/,
     ""
   );
+}
+
+/** Student portal URLs for magic links + Stripe return. */
+function accountPath(env, query = "") {
+  const q = !query ? "" : query.startsWith("?") ? query : `?${query}`;
+  const dedicated = (env.ACCOUNT_DOMAIN || "").replace(/\/$/, "");
+  if (dedicated) return `${dedicated}/account${q}`;
+  return `${siteBase(env)}/account${q}`;
+}
+
+function portalPayload(enrollment, payload) {
+  const months = enrollment.scheduleMonths || 12;
+  const schedule = buildSchedule(enrollment, payload.holidays, months);
+  const payments = (payload.payments || [])
+    .filter((p) => p.enrollmentId === enrollment.id)
+    .slice(0, 40);
+  return {
+    enrollment: publicEnrollment(enrollment),
+    schedule,
+    billingItems: buildBillingItems(enrollment, payments, months),
+    payments,
+  };
 }
 
 async function requireStudentSession(request, payload) {
@@ -92,6 +116,11 @@ export async function handleStudentRoutes({
     const format = body?.format || "in_person";
     const billingMode =
       body?.billingMode === "auto" ? "auto" : "manual";
+    let scheduleMonths = Number(body?.scheduleMonths);
+    if (!Number.isFinite(scheduleMonths) || scheduleMonths < 1) {
+      scheduleMonths = 12;
+    }
+    scheduleMonths = Math.min(24, Math.round(scheduleMonths));
     if (!name || !email || !start || !end) {
       return json(
         { error: "name, email, start, and end are required." },
@@ -125,6 +154,7 @@ export async function handleStudentRoutes({
           durationMinutes: mins,
           format,
           weekday,
+          scheduleMonths,
           // Don't demote an active Stripe subscription to manual via re-invite
           billingMode:
             existing.billingMode === "auto" && existing.stripeSubscriptionId
@@ -144,6 +174,7 @@ export async function handleStudentRoutes({
           weekday,
           status: "invited",
           billingMode,
+          scheduleMonths,
           amountDueCents: 0,
           periodKey: null,
           paidThroughPeriodKey: null,
@@ -173,7 +204,7 @@ export async function handleStudentRoutes({
     };
     await writePayload(env, payload);
 
-    const magicUrl = `${siteBase(env)}/account?token=${issued.token}`;
+    const magicUrl = accountPath(env, `?token=${issued.token}`);
     let emailWarning = "";
     try {
       await sendStudentInviteEmail(env, {
@@ -224,7 +255,7 @@ export async function handleStudentRoutes({
     payload = updateEnrollment(payload, enrollment);
     await writePayload(env, payload);
 
-    const magicUrl = `${siteBase(env)}/account?token=${issued.token}`;
+    const magicUrl = accountPath(env, `?token=${issued.token}`);
     try {
       await sendStudentInviteEmail(env, {
         name: enrollment.name,
@@ -264,15 +295,10 @@ export async function handleStudentRoutes({
     payload = updateEnrollment(payload, enrollment);
     await writePayload(env, payload);
 
-    const schedule = upcomingLessons(enrollment, payload.holidays, 8);
     return json(
       {
         sessionToken: issued.token,
-        enrollment: publicEnrollment(enrollment),
-        schedule,
-        payments: (payload.payments || [])
-          .filter((p) => p.enrollmentId === enrollment.id)
-          .slice(0, 20),
+        ...portalPayload(enrollment, payload),
       },
       200,
       origin
@@ -307,7 +333,7 @@ export async function handleStudentRoutes({
     enrollment = issued.enrollment;
     payload = updateEnrollment(payload, enrollment);
     await writePayload(env, payload);
-    const magicUrl = `${siteBase(env)}/account?token=${issued.token}`;
+    const magicUrl = accountPath(env, `?token=${issued.token}`);
     try {
       await sendStudentInviteEmail(env, {
         name: enrollment.name,
@@ -332,17 +358,7 @@ export async function handleStudentRoutes({
     delete enrollment._proration;
     payload = updateEnrollment(payload, enrollment);
     await writePayload(env, payload);
-    return json(
-      {
-        enrollment: publicEnrollment(enrollment),
-        schedule: upcomingLessons(enrollment, payload.holidays, 8),
-        payments: (payload.payments || [])
-          .filter((p) => p.enrollmentId === enrollment.id)
-          .slice(0, 20),
-      },
-      200,
-      origin
-    );
+    return json(portalPayload(enrollment, payload), 200, origin);
   }
 
   if (request.method === "POST" && route === "/studio/account/checkout") {
@@ -368,9 +384,11 @@ export async function handleStudentRoutes({
     const prorationHint = enrollment._proration;
     delete enrollment._proration;
 
-    const base = siteBase(env);
-    const successUrl = `${base}/account?paid=1&session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = `${base}/account?canceled=1`;
+    const successUrl = accountPath(
+      env,
+      "?paid=1&session_id={CHECKOUT_SESSION_ID}"
+    );
+    const cancelUrl = accountPath(env, "?canceled=1");
     const mins = enrollment.durationMinutes;
     const priceId = env[`STRIPE_PRICE_${mins}`] || "";
 

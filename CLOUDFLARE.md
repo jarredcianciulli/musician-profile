@@ -13,6 +13,8 @@ Create **CNAME** (or tunnel-managed) records, proxied (orange cloud):
 | `@` (apex) | your Cloudflare Tunnel hostname / `cfargotunnel.com` route |
 | `www` | same tunnel |
 | `staging` | same tunnel |
+| `account` | same tunnel (student portal — no marketing nav) |
+| `account-staging` | same tunnel |
 | `lab` | same tunnel |
 | `lab-staging` | same tunnel |
 | `method` | same tunnel |
@@ -32,12 +34,45 @@ In Zero Trust → Networks → Tunnels → your Pi tunnel → Public Hostname:
 | `batterystringstudio.com` | `http://127.0.0.1:80` |
 | `www.batterystringstudio.com` | `http://127.0.0.1:80` |
 | `staging.batterystringstudio.com` | `http://127.0.0.1:80` |
+| `account.batterystringstudio.com` | `http://127.0.0.1:80` |
+| `account-staging.batterystringstudio.com` | `http://127.0.0.1:80` |
 | `lab.batterystringstudio.com` | `http://127.0.0.1:80` |
 | `lab-staging.batterystringstudio.com` | `http://127.0.0.1:80` |
 | `method.batterystringstudio.com` | `http://127.0.0.1:80` |
 | `method-staging.batterystringstudio.com` | `http://127.0.0.1:80` |
 
 All go to **Caddy on :80**. Caddy picks the app by `Host` header (`Caddyfile.bss-routes`).
+
+### Student account subdomain
+
+Same Next.js containers as the marketing site (prod `8087`, staging `8088`). Add Host routes in `Caddyfile.bss-routes`:
+
+```
+account.batterystringstudio.com {
+  reverse_proxy 127.0.0.1:8087
+}
+account-staging.batterystringstudio.com {
+  reverse_proxy 127.0.0.1:8088
+}
+```
+
+App middleware serves `/account` (and rewrites `/` → `/account`) on those hosts, and redirects other paths to the marketing site.
+
+Set on the Pi `.env` (and rebuild):
+
+```
+NEXT_PUBLIC_ACCOUNT_DOMAIN=https://account.batterystringstudio.com
+NEXT_PUBLIC_MARKETING_DOMAIN=https://batterystringstudio.com
+```
+
+Staging:
+
+```
+NEXT_PUBLIC_ACCOUNT_DOMAIN=https://account-staging.batterystringstudio.com
+NEXT_PUBLIC_MARKETING_DOMAIN=https://staging.batterystringstudio.com
+```
+
+Worker magic links use `ACCOUNT_DOMAIN` in `workers/studio-api/wrangler.toml` (already set for prod + staging). Redeploy Workers after changing it.
 
 ## 3. Pi: Caddy + runner + first deploy
 

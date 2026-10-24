@@ -104,6 +104,7 @@ const Admin: React.FC = () => {
   const [inviteBilling, setInviteBilling] = useState<"manual" | "auto">(
     "manual"
   );
+  const [inviteScheduleMonths, setInviteScheduleMonths] = useState(12);
   const [inviteSlots, setInviteSlots] = useState<
     { start: string; end: string; label: string }[]
   >([]);
@@ -239,6 +240,7 @@ const Admin: React.FC = () => {
           end,
           format: inviteFormat,
           billingMode: inviteBilling,
+          scheduleMonths: inviteScheduleMonths,
         },
         token
       );
@@ -774,7 +776,7 @@ const Admin: React.FC = () => {
                 />
               </label>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <label className="text-sm block">
                 <span className="text-muted text-xs uppercase tracking-wider">
                   Length
@@ -823,6 +825,24 @@ const Admin: React.FC = () => {
                 >
                   <option value="manual">Pay by link (manual)</option>
                   <option value="auto">Auto-charge monthly</option>
+                </select>
+              </label>
+              <label className="text-sm block">
+                <span className="text-muted text-xs uppercase tracking-wider">
+                  Schedule horizon
+                </span>
+                <select
+                  className="admin-input mt-1"
+                  value={inviteScheduleMonths}
+                  onChange={(e) =>
+                    setInviteScheduleMonths(Number(e.target.value))
+                  }
+                >
+                  {[3, 6, 9, 12, 18, 24].map((m) => (
+                    <option key={m} value={m}>
+                      {m} months
+                    </option>
+                  ))}
                 </select>
               </label>
             </div>

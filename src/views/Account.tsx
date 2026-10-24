@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   clearAccountSessionToken,
@@ -12,13 +11,38 @@ import {
   startAccountCheckout,
   type AccountPortalData,
 } from "../lib/bookingApi";
+import {
+  buildLessonsIcs,
+  downloadIcs,
+  googleCalendarUrlForLesson,
+} from "../lib/accountCalendar";
 import { formatSlotDay, formatSlotTime } from "../lib/slots";
+import { marketingSiteUrl } from "../lib/env";
 
 const TZ = "America/New_York";
 
 function formatMoney(cents: number) {
   const dollars = cents / 100;
   return dollars % 1 === 0 ? `$${dollars}` : `$${dollars.toFixed(2)}`;
+}
+
+function statusLabel(status: string) {
+  switch (status) {
+    case "paid":
+      return "Paid";
+    case "due":
+      return "Due now";
+    case "upcoming":
+      return "Scheduled";
+    case "scheduled":
+      return "Scheduled";
+    case "holiday":
+      return "Holiday";
+    case "break":
+      return "Break";
+    default:
+      return status;
+  }
 }
 
 const Account: React.FC = () => {
@@ -47,7 +71,6 @@ const Account: React.FC = () => {
           const next = await exchangeAccountMagicToken(token);
           if (!cancelled) {
             setData(next);
-            // Drop token from URL without full reload
             if (typeof window !== "undefined") {
               const url = new URL(window.location.href);
               url.searchParams.delete("token");
@@ -103,10 +126,8 @@ const Account: React.FC = () => {
     setError("");
     setLinkSent(false);
     try {
-      const result = await requestAccountMagicLink(email.trim());
+      await requestAccountMagicLink(email.trim());
       setLinkSent(true);
-      setError("");
-      void result;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not send link.");
     } finally {
@@ -133,7 +154,7 @@ const Account: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="section-container py-20 max-w-lg">
+      <div className="section-container py-20 max-w-2xl">
         <p className="text-muted text-sm">Loading your account…</p>
       </div>
     );
@@ -186,25 +207,48 @@ const Account: React.FC = () => {
           </button>
         </form>
         <p className="text-sm text-muted mt-8">
-          <Link href="/" className="underline underline-offset-2">
-            Back to home
-          </Link>
+          <a
+            href={marketingSiteUrl()}
+            className="underline underline-offset-2"
+          >
+            Studio website
+          </a>
         </p>
       </div>
     );
   }
 
-  const { enrollment, schedule, payments } = data;
+  const { enrollment, schedule, billingItems, payments } = data;
   const due = enrollment.amountDueCents || 0;
   const mode = enrollment.billingMode || "manual";
   const autoReady = mode === "auto" && Boolean(enrollment.stripeSubscriptionId);
   const showAutoSetup = mode === "auto" && !enrollment.stripeSubscriptionId;
   const showManualPay = mode === "manual" || mode === "unset";
-  // unset = legacy invites; show both. New invites set manual or auto.
   const showChoice = mode === "unset";
 
+  const lessonsOnly = (schedule || [])
+    .filter((row) => row.type === "lesson" && row.start && row.end)
+    .map((row) => ({
+      start: row.start,
+      end: row.end as string,
+      title: row.title,
+    }));
+  const lessonTitle = `Lesson — ${enrollment.name}`;
+  const billingRows = billingItems || [];
+
+  const downloadAllCalendars = () => {
+    const ics = buildLessonsIcs(lessonsOnly, {
+      name: enrollment.name,
+      calendarName: `BSS — ${enrollment.name}`,
+    });
+    downloadIcs(
+      `bss-lessons-${enrollment.name.replace(/\s+/g, "-").toLowerCase()}.ics`,
+      ics
+    );
+  };
+
   return (
-    <div className="section-container py-16 max-w-xl">
+    <div className="section-container py-12 max-w-2xl">
       <div className="flex items-start justify-between gap-4 mb-8">
         <div>
           <p className="text-[11px] uppercase tracking-[0.18em] text-sky-deep font-semibold">
@@ -226,12 +270,13 @@ const Account: React.FC = () => {
 
       {paidBanner ? (
         <p className="text-sm border border-line bg-paper-muted/50 px-4 py-3 mb-6">
-          Payment received — thank you. Your schedule and billing status are
-          below.
+          Payment received — thank you.
         </p>
       ) : null}
       {canceledBanner ? (
-        <p className="text-sm text-muted mb-6">Checkout canceled. You can try again anytime.</p>
+        <p className="text-sm text-muted mb-6">
+          Checkout canceled. You can try again anytime.
+        </p>
       ) : null}
       {error ? (
         <p className="text-sm text-accent mb-4" role="alert">
@@ -240,35 +285,113 @@ const Account: React.FC = () => {
       ) : null}
 
       <section className="mb-10">
-        <h2 className="font-display text-2xl mb-2">Upcoming lessons</h2>
-        <p className="text-sm text-muted mb-4">
-          {enrollment.durationMinutes}-minute{" "}
-          {enrollment.format === "online" ? "online" : "in-person"} weekly spot
+        <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
+          <div>
+            <h2 className="font-display text-2xl">Schedule</h2>
+            <p className="text-sm text-muted mt-1">
+              {enrollment.durationMinutes}-minute{" "}
+              {enrollment.format === "online" ? "online" : "in-person"} · next{" "}
+              {enrollment.scheduleMonths || 12} months
+            </p>
+          </div>
+          {lessonsOnly.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="btn-secondary text-xs"
+                onClick={downloadAllCalendars}
+              >
+                Apple Calendar (.ics)
+              </button>
+              <button
+                type="button"
+                className="btn-secondary text-xs"
+                onClick={downloadAllCalendars}
+              >
+                Google Calendar (.ics)
+              </button>
+              {lessonsOnly[0] ? (
+                <a
+                  className="btn-secondary text-xs inline-flex items-center"
+                  href={googleCalendarUrlForLesson(
+                    lessonsOnly[0],
+                    lessonTitle
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Next lesson → Google
+                </a>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+        <p className="text-xs text-muted mb-3">
+          Download .ics once, then open in Apple Calendar or import in Google
+          Calendar (Settings → Import).
         </p>
-        {schedule.length === 0 ? (
+        {(schedule || []).length === 0 ? (
           <p className="text-sm text-ink-soft">No upcoming times listed yet.</p>
         ) : (
-          <ul className="divide-y divide-line border border-line bg-white">
-            {schedule.map((lesson) => (
-              <li
-                key={lesson.start}
-                className="px-4 py-3 flex justify-between gap-3 text-sm"
-              >
-                <span>{formatSlotDay(lesson.start, TZ)}</span>
-                <span className="text-ink-soft">
-                  {formatSlotTime(lesson.start, TZ)}
-                  {lesson.end ? ` – ${formatSlotTime(lesson.end, TZ)}` : ""}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <div className="border border-line bg-white overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="border-b border-line text-xs uppercase tracking-wider text-muted">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Date</th>
+                  <th className="px-3 py-2 font-medium">Type</th>
+                  <th className="px-3 py-2 font-medium">Time / note</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {schedule.map((row) => {
+                  const isOff =
+                    row.type === "holiday" || row.type === "break";
+                  return (
+                    <tr
+                      key={`${row.type}-${row.start}`}
+                      className={`border-b border-line/70 last:border-0 ${
+                        isOff ? "bg-paper-muted/40" : ""
+                      }`}
+                    >
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {formatSlotDay(row.start, TZ)}
+                      </td>
+                      <td className="px-3 py-2 capitalize">
+                        {row.type === "lesson"
+                          ? "Lesson"
+                          : row.type === "break"
+                            ? "Break"
+                            : "Holiday"}
+                      </td>
+                      <td className="px-3 py-2 text-ink-soft">
+                        {isOff
+                          ? row.title ||
+                            (row.holidayStart && row.holidayEnd
+                              ? `${row.holidayStart} → ${row.holidayEnd}`
+                              : "Studio closed")
+                          : `${formatSlotTime(row.start, TZ)}${
+                              row.end
+                                ? ` – ${formatSlotTime(row.end, TZ)}`
+                                : ""
+                            }`}
+                      </td>
+                      <td className="px-3 py-2">
+                        {statusLabel(row.status || row.type)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
       <section className="mb-10">
         <h2 className="font-display text-2xl mb-2">Billing</h2>
         {autoReady ? (
-          <div className="border border-line bg-white px-4 py-4 text-sm space-y-1">
+          <div className="border border-line bg-white px-4 py-4 text-sm space-y-1 mb-4">
             <p className="font-medium">Auto-charge monthly</p>
             <p className="text-ink-soft">
               Card on file
@@ -276,10 +399,9 @@ const Account: React.FC = () => {
                 ? ` · renews around ${formatSlotDay(enrollment.nextDueAt, TZ)}`
                 : ""}
             </p>
-            <p className="text-muted">Nothing due right now.</p>
           </div>
         ) : showAutoSetup ? (
-          <div className="border border-line bg-white px-4 py-4 text-sm space-y-3">
+          <div className="border border-line bg-white px-4 py-4 text-sm space-y-3 mb-4">
             <p className="font-medium">Set up monthly auto-charge</p>
             <p className="text-ink-soft">
               First period: {formatMoney(due)} (proration if mid-month), then
@@ -295,19 +417,9 @@ const Account: React.FC = () => {
             </button>
           </div>
         ) : (
-          <div className="border border-line bg-white px-4 py-4 text-sm space-y-3">
-            <p>
-              <span className="text-muted">Amount due this period: </span>
-              <span className="font-medium text-lg">{formatMoney(due)}</span>
-            </p>
-            {enrollment.paidThroughPeriodKey ? (
-              <p className="text-muted text-xs">
-                Paid through {enrollment.paidThroughPeriodKey}
-              </p>
-            ) : null}
-
+          <div className="border border-line bg-white px-4 py-4 text-sm space-y-3 mb-4">
             {showChoice ? (
-              <div className="grid gap-3 sm:grid-cols-2 pt-2">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"
                   className="btn-primary"
@@ -338,34 +450,68 @@ const Account: React.FC = () => {
               >
                 {checkoutBusy === "manual"
                   ? "Redirecting…"
-                  : `Pay ${formatMoney(due)}`}
+                  : `Pay ${formatMoney(due)} due now`}
               </button>
             ) : (
               <p className="text-muted">You&apos;re paid up for this period.</p>
             )}
           </div>
         )}
+
+        {billingRows.length > 0 ? (
+          <div className="border border-line bg-white overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="border-b border-line text-xs uppercase tracking-wider text-muted">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Period</th>
+                  <th className="px-3 py-2 font-medium">Item</th>
+                  <th className="px-3 py-2 font-medium">Amount</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {billingRows.map((item) => (
+                  <tr
+                    key={item.periodKey}
+                    className={`border-b border-line/70 last:border-0 ${
+                      item.status === "due" ? "bg-paper-muted/50" : ""
+                    }`}
+                  >
+                    <td className="px-3 py-2 whitespace-nowrap font-mono text-xs">
+                      {item.periodKey}
+                    </td>
+                    <td className="px-3 py-2 text-ink-soft">{item.label}</td>
+                    <td className="px-3 py-2">
+                      {formatMoney(item.amountCents)}
+                    </td>
+                    <td className="px-3 py-2">{statusLabel(item.status)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
       </section>
 
-      {(payments || []).length > 0 ? (
+      {(payments || []).some((p) => p.status === "paid") ? (
         <section>
-          <h2 className="font-display text-xl mb-3">Recent payments</h2>
+          <h2 className="font-display text-xl mb-3">Payment history</h2>
           <ul className="text-sm divide-y divide-line border border-line bg-white">
-            {payments.slice(0, 8).map((p) => (
-              <li
-                key={p.id}
-                className="px-4 py-2.5 flex justify-between gap-2"
-              >
-                <span className="text-ink-soft">
-                  {p.kind}
-                  {p.periodKey ? ` · ${p.periodKey}` : ""}
-                </span>
-                <span>
-                  {formatMoney(p.amountCents)}{" "}
-                  <span className="text-muted">{p.status}</span>
-                </span>
-              </li>
-            ))}
+            {payments
+              .filter((p) => p.status === "paid")
+              .slice(0, 12)
+              .map((p) => (
+                <li
+                  key={p.id}
+                  className="px-4 py-2.5 flex justify-between gap-2"
+                >
+                  <span className="text-ink-soft">
+                    {p.kind}
+                    {p.periodKey ? ` · ${p.periodKey}` : ""}
+                  </span>
+                  <span>{formatMoney(p.amountCents)}</span>
+                </li>
+              ))}
           </ul>
         </section>
       ) : null}
