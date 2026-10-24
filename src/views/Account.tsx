@@ -27,6 +27,7 @@ import { formatSlotDay, formatSlotTime } from "../lib/slots";
 import { marketingSiteUrl, studioEmail } from "../lib/env";
 import { collectReturnQuery } from "../lib/returnQuery";
 import StudioPolicyBody from "../components/StudioPolicyBody";
+import { lockBodyScroll, unlockBodyScroll } from "../lib/scrollLock";
 
 const SCHEDULE_COLLAPSE_KEY = "bss_account_schedule_open";
 
@@ -77,6 +78,7 @@ const Account: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [policyChecked, setPolicyChecked] = useState(false);
+  const [paidModalOpen, setPaidModalOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const paidBanner = searchParams.get("paid") === "1";
   const canceledBanner = searchParams.get("canceled") === "1";
@@ -100,15 +102,64 @@ const Account: React.FC = () => {
   }, [scheduleOpen]);
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (paidBanner && data?.enrollment) setPaidModalOpen(true);
+  }, [paidBanner, data?.enrollment]);
+
+  useEffect(() => {
+    if (!paidModalOpen) return;
+    lockBodyScroll();
+    return () => unlockBodyScroll();
+  }, [paidModalOpen]);
+
+  const closePaidModal = () => {
+    setPaidModalOpen(false);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("paid");
+      url.searchParams.delete("session_id");
+      const qs = url.searchParams.toString();
+      window.history.replaceState(
+        {},
+        "",
+        `${url.pathname}${qs ? `?${qs}` : ""}${url.hash}`
+      );
+    } catch {
+      /* ignore */
+    }
+  };
+
+  useEffect(() => {
+    if (!menuOpen && !paidModalOpen && !infoOpen) return;
     const onDoc = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+      if (
+        menuOpen &&
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node)
+      ) {
+        setMenuOpen(false);
+      }
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setMenuOpen(false);
-        setInfoOpen(false);
+      if (e.key !== "Escape") return;
+      if (paidModalOpen) {
+        setPaidModalOpen(false);
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete("paid");
+          url.searchParams.delete("session_id");
+          const qs = url.searchParams.toString();
+          window.history.replaceState(
+            {},
+            "",
+            `${url.pathname}${qs ? `?${qs}` : ""}${url.hash}`
+          );
+        } catch {
+          /* ignore */
+        }
+        return;
       }
+      setMenuOpen(false);
+      setInfoOpen(false);
     };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
@@ -116,7 +167,7 @@ const Account: React.FC = () => {
       document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("keydown", onKey);
     };
-  }, [menuOpen]);
+  }, [menuOpen, paidModalOpen, infoOpen]);
 
   useEffect(() => {
     if (!data?.enrollment?.id || !data.schedule) return;
@@ -470,6 +521,37 @@ const Account: React.FC = () => {
         </div>
       </div>
 
+      {paidModalOpen ? (
+        <div
+          className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-ink/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="account-paid-title"
+        >
+          <div className="bg-white border border-line w-full max-w-md p-6 sm:p-8 space-y-5 shadow-sm">
+            <h2
+              id="account-paid-title"
+              className="font-display text-3xl leading-tight"
+            >
+              Thank you!
+            </h2>
+            <p className="text-base text-ink/90 leading-relaxed">
+              {enrollment.billingMode === "auto"
+                ? "You’re set up for automatic payments on the 1st of each month. Let’s make some music."
+                : "Your payment was received. Let’s make some music."}
+            </p>
+            <button
+              type="button"
+              className="btn-primary w-full sm:w-auto"
+              onClick={closePaidModal}
+              autoFocus
+            >
+              Continue to account
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {infoOpen ? (
         <div
           className="fixed inset-0 z-30 flex items-end sm:items-center justify-center bg-ink/30 p-4"
@@ -557,11 +639,6 @@ const Account: React.FC = () => {
         </div>
       ) : null}
 
-      {paidBanner ? (
-        <p className="text-sm border border-line bg-paper-muted/50 px-4 py-3 mb-6">
-          Payment received — thank you.
-        </p>
-      ) : null}
       {canceledBanner ? (
         <p className="text-sm text-muted mb-6">
           Checkout canceled. You can try again anytime.
