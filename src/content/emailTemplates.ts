@@ -51,9 +51,9 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     id: "subscription_client",
     name: "Subscription confirmation (student)",
     audience: "student",
-    subject: "You're in — weekly lessons at Battery String Studio",
+    subject: "Your weekly lesson is reserved — Battery String Studio",
     description: "Sent after public subscribe or portal auto-setup succeeds.",
-    outline: ["Welcome", "Weekly slot", "Billing summary", "Policy reminder"],
+    outline: ["Welcome", "Weekly slot", "Format", "Monthly tuition note"],
   },
   {
     id: "subscription_studio",

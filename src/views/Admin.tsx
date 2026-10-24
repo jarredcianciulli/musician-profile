@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import BowStringMark from "../components/brand/BowStringMark";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { useConfirmModal } from "../hooks/useConfirmModal";
@@ -99,6 +100,7 @@ const emptyEvent = (): StudioEvent => ({
 });
 
 const Admin: React.FC = () => {
+  const searchParams = useSearchParams();
   const { confirm, confirmProps } = useConfirmModal();
   const [authed, setAuthed] = useState(Boolean(getAdminToken()));
   const [tokenInput, setTokenInput] = useState("");
@@ -147,6 +149,19 @@ const Admin: React.FC = () => {
     Record<string, string>
   >({});
   const [adminTab, setAdminTab] = useState<AdminTab>("students");
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (
+      tab === "students" ||
+      tab === "bookings" ||
+      tab === "schedule" ||
+      tab === "marketing" ||
+      tab === "emails"
+    ) {
+      setAdminTab(tab);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!authed) return;
@@ -1983,9 +1998,17 @@ const Admin: React.FC = () => {
                   >
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <p className="font-medium">{t.name}</p>
-                      <span className="text-xs uppercase tracking-wider text-muted">
-                        {t.audience}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs uppercase tracking-wider text-muted">
+                          {t.audience}
+                        </span>
+                        <Link
+                          href={`/admin/emails/templates/${t.id}`}
+                          className="btn-secondary text-xs"
+                        >
+                          Open
+                        </Link>
+                      </div>
                     </div>
                     <p className="text-xs text-muted font-mono">{t.id}</p>
                     <p className="text-ink-soft">
@@ -2025,21 +2048,29 @@ const Admin: React.FC = () => {
                           key={em.id}
                           className="bg-white border border-line px-4 py-3 text-sm space-y-1"
                         >
-                          <div className="flex flex-wrap justify-between gap-2">
+                          <div className="flex flex-wrap justify-between gap-2 items-start">
                             <p className="font-medium">
                               {tmpl?.name || em.templateId}
                             </p>
-                            <span
-                              className={`text-xs uppercase tracking-wider ${
-                                em.status === "sent"
-                                  ? "text-sky-deep"
-                                  : em.status === "failed"
-                                    ? "text-accent"
-                                    : "text-muted"
-                              }`}
-                            >
-                              {em.status}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`text-xs uppercase tracking-wider ${
+                                  em.status === "sent"
+                                    ? "text-sky-deep"
+                                    : em.status === "failed"
+                                      ? "text-accent"
+                                      : "text-muted"
+                                }`}
+                              >
+                                {em.status}
+                              </span>
+                              <Link
+                                href={`/admin/emails/sent/${em.id}`}
+                                className="btn-secondary text-xs"
+                              >
+                                Open
+                              </Link>
+                            </div>
                           </div>
                           <p className="text-muted">
                             To {em.toName || em.to} · {em.subject}

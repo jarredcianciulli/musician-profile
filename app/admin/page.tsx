@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Admin from "@/views/Admin";
 
 export const metadata: Metadata = {
@@ -7,5 +8,15 @@ export const metadata: Metadata = {
 };
 
 export default function AdminPage() {
-  return <Admin />;
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-paper flex items-center justify-center text-muted text-sm">
+          Loading admin…
+        </div>
+      }
+    >
+      <Admin />
+    </Suspense>
+  );
 }

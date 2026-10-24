@@ -526,21 +526,29 @@ const AdminStudentDetail: React.FC = () => {
                         key={em.id}
                         className="border border-line px-3 py-3 text-sm space-y-1"
                       >
-                        <div className="flex flex-wrap justify-between gap-2">
+                        <div className="flex flex-wrap justify-between gap-2 items-start">
                           <p className="font-medium">
                             {tmpl?.name || em.templateId}
                           </p>
-                          <span
-                            className={`text-xs uppercase tracking-wider ${
-                              em.status === "sent"
-                                ? "text-sky-deep"
-                                : em.status === "failed"
-                                  ? "text-accent"
-                                  : "text-muted"
-                            }`}
-                          >
-                            {em.status}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-xs uppercase tracking-wider ${
+                                em.status === "sent"
+                                  ? "text-sky-deep"
+                                  : em.status === "failed"
+                                    ? "text-accent"
+                                    : "text-muted"
+                              }`}
+                            >
+                              {em.status}
+                            </span>
+                            <Link
+                              href={`/admin/emails/sent/${em.id}`}
+                              className="btn-secondary text-xs"
+                            >
+                              Open
+                            </Link>
+                          </div>
                         </div>
                         <p className="text-muted">{em.subject}</p>
                         <p className="text-xs text-muted">
@@ -551,9 +559,6 @@ const AdminStudentDetail: React.FC = () => {
                         </p>
                         {em.error ? (
                           <p className="text-xs text-accent">{em.error}</p>
-                        ) : null}
-                        {em.preview ? (
-                          <p className="text-xs text-muted">{em.preview}</p>
                         ) : null}
                       </li>
                     );

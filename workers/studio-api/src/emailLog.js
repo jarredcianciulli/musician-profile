@@ -51,6 +51,7 @@ export async function sendAndLogEmail(env, payload, {
     error = `${result.status || ""} ${result.details || "send failed"}`.trim();
   }
 
+  const htmlRaw = String(html || "");
   const record = {
     id: newId("eml"),
     templateId: templateId || "unknown",
@@ -61,8 +62,10 @@ export async function sendAndLogEmail(env, payload, {
     status,
     error: error.slice(0, 800),
     createdAt: new Date().toISOString(),
-    /** Short plain preview for admin (strip tags roughly) */
-    preview: String(html || "")
+    /** Full HTML as sent (capped for KV size). */
+    html: htmlRaw.slice(0, 48000),
+    /** Short plain preview for list rows */
+    preview: htmlRaw
       .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim()

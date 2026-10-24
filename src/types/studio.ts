@@ -203,6 +203,8 @@ export type StudioEmailLog = {
   subject: string;
   status: "sent" | "failed" | "skipped" | string;
   error?: string;
+  /** Full HTML body as sent (when logged after storage was enabled). */
+  html?: string;
   preview?: string;
   createdAt: string;
 };
