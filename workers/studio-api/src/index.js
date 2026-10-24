@@ -377,7 +377,11 @@ function publicStudio(payload) {
 function busyBookings(payload) {
   const now = Date.now();
   const fromBookings = (payload.bookings || [])
-    .filter((b) => b.status !== "cancelled")
+    .filter(
+      (b) =>
+        b.status !== "cancelled" &&
+        b.status !== "completed"
+    )
     .map((b) => ({
       id: b.id,
       start: b.start,

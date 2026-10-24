@@ -519,6 +519,18 @@ export async function handleStudentRoutes({
     const amountCents = waived ? 0 : Math.round(amountDollars * 100);
     const isPast = endDate.getTime() < Date.now();
     const paidNow = waived || markPaid;
+    // Default complete for past lessons; explicit body.markComplete wins
+    const markComplete =
+      body?.markComplete === undefined || body?.markComplete === null
+        ? isPast && paidNow
+        : Boolean(body.markComplete);
+    if (markComplete && !paidNow) {
+      return json(
+        { error: "Mark the trial paid (or waive) before marking it complete." },
+        400,
+        origin
+      );
+    }
     const bookingId = newId("booking");
     const booking = {
       id: bookingId,
@@ -534,9 +546,14 @@ export async function handleStudentRoutes({
       lessonType: "trial",
       format,
       durationMinutes: mins,
-      status: paidNow ? "scheduled" : "pending_payment",
+      status: markComplete
+        ? "completed"
+        : paidNow
+          ? "scheduled"
+          : "pending_payment",
       amountCents,
       paidAt: paidNow ? new Date().toISOString() : undefined,
+      completedAt: markComplete ? new Date().toISOString() : undefined,
       enrollmentId: existing.id,
       createdAt: new Date().toISOString(),
     };
@@ -723,6 +740,7 @@ export async function handleStudentRoutes({
       ? "complimentary"
       : `$${(amountCents / 100).toFixed(amountCents % 100 === 0 ? 0 : 2)}`;
     const whenHint = isPast ? " (past)" : "";
+    const completeHint = markComplete ? " · completed" : "";
 
     return json(
       {
@@ -732,10 +750,103 @@ export async function handleStudentRoutes({
         magicUrl: magicUrl || undefined,
         emailWarning: emailWarning || undefined,
         summary: emailWarning
-          ? `Trial recorded for ${enrollment.email}${whenHint}, but email failed (${emailWarning}).`
+          ? `Trial recorded for ${enrollment.email}${whenHint}${completeHint}, but email failed (${emailWarning}).`
           : sendEmail
-            ? `Trial recorded and emailed to ${enrollment.email}${whenHint} · ${dollarsLabel}.`
-            : `Trial recorded on ${enrollment.name}'s account${whenHint} · ${dollarsLabel}. Shows on their schedule and payment history.`,
+            ? `Trial recorded and emailed to ${enrollment.email}${whenHint}${completeHint} · ${dollarsLabel}.`
+            : `Trial recorded on ${enrollment.name}'s account${whenHint}${completeHint} · ${dollarsLabel}. Shows on their schedule and payment history.`,
+      },
+      200,
+      origin
+    );
+  }
+
+  // ——— Admin: mark an existing trial booking complete ———
+  if (request.method === "POST" && route === "/studio/students/complete-trial") {
+    if (!adminOk()) return json({ error: "Unauthorized" }, 401, origin);
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ error: "Invalid JSON" }, 400, origin);
+    }
+    const bookingId = String(body?.bookingId || "").trim();
+    const enrollmentId = String(body?.enrollmentId || "").trim();
+    if (!bookingId && !enrollmentId) {
+      return json(
+        { error: "bookingId or enrollmentId is required." },
+        400,
+        origin
+      );
+    }
+
+    let payload = await readPayload(env);
+    let booking = bookingId
+      ? (payload.bookings || []).find((b) => b.id === bookingId)
+      : null;
+    if (!booking && enrollmentId) {
+      const enr = (payload.enrollments || []).find((e) => e.id === enrollmentId);
+      const tid = enr?.trialBookingId;
+      booking =
+        (tid && (payload.bookings || []).find((b) => b.id === tid)) ||
+        (payload.bookings || [])
+          .filter(
+            (b) =>
+              b.enrollmentId === enrollmentId &&
+              b.lessonType === "trial" &&
+              b.status !== "cancelled" &&
+              b.status !== "completed"
+          )
+          .sort((a, b) => (b.start || "").localeCompare(a.start || ""))[0] ||
+        null;
+    }
+    if (!booking || booking.lessonType !== "trial") {
+      return json({ error: "Trial booking not found." }, 404, origin);
+    }
+    if (booking.status === "cancelled") {
+      return json({ error: "That trial was cancelled." }, 409, origin);
+    }
+    if (booking.status === "completed") {
+      return json(
+        {
+          ok: true,
+          booking,
+          summary: "Trial was already marked complete.",
+        },
+        200,
+        origin
+      );
+    }
+    if (booking.status === "pending_payment") {
+      return json(
+        {
+          error:
+            "Trial still awaiting payment. Mark paid / waive first, or record it as paid.",
+        },
+        409,
+        origin
+      );
+    }
+
+    const completedAt = new Date().toISOString();
+    const nextBooking = {
+      ...booking,
+      status: "completed",
+      completedAt,
+    };
+    payload = {
+      ...payload,
+      bookings: (payload.bookings || []).map((b) =>
+        b.id === booking.id ? nextBooking : b
+      ),
+      updatedAt: completedAt,
+    };
+    await writePayload(env, payload);
+
+    return json(
+      {
+        ok: true,
+        booking: nextBooking,
+        summary: `Trial for ${booking.name || booking.email} marked complete.`,
       },
       200,
       origin

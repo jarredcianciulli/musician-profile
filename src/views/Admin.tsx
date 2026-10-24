@@ -1832,10 +1832,31 @@ const Admin: React.FC = () => {
                       </p>
                     ) : null}
                   </div>
-                  <span className="text-xs uppercase tracking-wider text-sky-deep">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs uppercase tracking-wider text-sky-deep">
                       {b.status}
-                      {b.status === "pending_payment" ? " (awaiting Stripe)" : ""}
-                  </span>
+                      {b.status === "pending_payment"
+                        ? " (awaiting Stripe)"
+                        : b.status === "completed"
+                          ? " ✓"
+                          : ""}
+                    </span>
+                    {b.lessonType === "trial" &&
+                    b.status !== "completed" &&
+                    b.status !== "cancelled" &&
+                    b.status !== "pending_payment" ? (
+                      <Link
+                        href={
+                          b.enrollmentId
+                            ? `/admin/students/${b.enrollmentId}?section=trial`
+                            : "/admin"
+                        }
+                        className="btn-secondary text-xs"
+                      >
+                        Open student
+                      </Link>
+                    ) : null}
+                  </div>
                 </li>
               ))}
             </ul>

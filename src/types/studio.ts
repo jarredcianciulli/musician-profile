@@ -51,6 +51,7 @@ export type AvailabilityConfig = {
 
 export type LessonBookingStatus =
   | "scheduled"
+  | "completed"
   | "cancelled"
   | "pending_payment"
   | "reserved";
@@ -77,8 +78,11 @@ export type LessonBooking = {
   stripePaymentIntent?: string;
   amountCents?: number;
   paidAt?: string;
+  /** Set when admin marks the lesson finished (esp. trials). */
+  completedAt?: string;
   emailsSentAt?: string;
   emailError?: string;
+  enrollmentId?: string;
 };
 
 export type StudioSubscription = {

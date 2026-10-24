@@ -203,11 +203,13 @@ export function mergeScheduleWithBookings(schedule, enrollment, bookings = []) {
       ).toISOString();
     const ended = new Date(endIso).getTime() < Date.now();
     const status =
-      b.status === "pending_payment"
-        ? "pending_payment"
-        : ended
-          ? "completed"
-          : "scheduled";
+      b.status === "completed"
+        ? "completed"
+        : b.status === "pending_payment"
+          ? "pending_payment"
+          : ended
+            ? "completed"
+            : "scheduled";
 
     const nearIdx = rows.findIndex((r) => {
       if (!r?.start) return false;

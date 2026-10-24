@@ -2,6 +2,7 @@ export type AdminConfirmAction =
   | "sendInvite"
   | "sendTrialInvite"
   | "recordTrial"
+  | "completeTrial"
   | "resendMagicLink"
   | "cancelInvite"
   | "openAsStudent";
@@ -65,6 +66,14 @@ export function getAdminConfirmCopy(
               vars.whenLabel ? ` on ${vars.whenLabel}` : ""
             } to ${who}'s account. It will show on their schedule and billing. No email unless you opted in.`,
         confirmLabel: vars.waived ? "Record complimentary trial" : "Record trial",
+      };
+    case "completeTrial":
+      return {
+        title: "Mark trial complete?",
+        body: `Mark the trial${
+          vars.whenLabel ? ` on ${vars.whenLabel}` : ""
+        } for ${who} as completed. It stays on their schedule as finished.`,
+        confirmLabel: "Mark complete",
       };
     case "resendMagicLink":
       return {

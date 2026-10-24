@@ -532,6 +532,8 @@ export async function recordTrialForStudent(
     waive?: boolean;
     /** Default true — mark paid without Stripe (typical for past lessons). */
     markPaid?: boolean;
+    /** Mark the lesson finished (default true for past + paid). */
+    markComplete?: boolean;
     /** Optional: also email invite / pay link. Default false. */
     sendEmail?: boolean;
   },
@@ -551,6 +553,27 @@ export async function recordTrialForStudent(
     throw new Error(data.error || "Could not record trial.");
   }
   return data as RecordTrialResult;
+}
+
+/** Admin: mark an existing trial booking as completed. */
+export async function completeTrialBooking(
+  input: { bookingId?: string; enrollmentId?: string },
+  adminToken: string
+): Promise<{ ok: boolean; booking: LessonBooking; summary: string }> {
+  if (!apiBase) throw new Error("Complete trial requires the studio API.");
+  const res = await fetch(`${apiBase}/studio/students/complete-trial`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${adminToken}`,
+    },
+    body: JSON.stringify(input),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not mark trial complete.");
+  }
+  return data as { ok: boolean; booking: LessonBooking; summary: string };
 }
 
 export async function inviteStudent(

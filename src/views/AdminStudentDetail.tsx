@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import BowStringMark from "../components/brand/BowStringMark";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { useConfirmModal } from "../hooks/useConfirmModal";
@@ -17,12 +17,14 @@ import { nextLessonStartIso } from "../lib/studentSchedule";
 import { grantStudentEditAccess } from "../lib/adminStudentEditGate";
 import {
   cancelStudentInvite,
+  completeTrialBooking,
   impersonateStudent,
   recordTrialForStudent,
   resendStudentMagicLink,
 } from "../lib/bookingApi";
 import type {
   HolidayWeek,
+  LessonBooking,
   LessonFormat,
   StudentEnrollment,
   StudioEmailLog,
@@ -53,18 +55,33 @@ function isPendingInvite(e: StudentEnrollment) {
 const AdminStudentDetail: React.FC = () => {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { confirm, confirmProps } = useConfirmModal();
   const id = String(params?.id || "");
   const [payload, setPayload] = useState<StudioPayload | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [section, setSection] = useState<NavId>("account");
+
+  useEffect(() => {
+    const s = searchParams.get("section");
+    if (
+      s === "account" ||
+      s === "subscription" ||
+      s === "custom" ||
+      s === "trial" ||
+      s === "emails"
+    ) {
+      setSection(s);
+    }
+  }, [searchParams]);
   const [trialLocal, setTrialLocal] = useState("");
   const [trialDuration, setTrialDuration] = useState<30 | 45>(30);
   const [trialFormat, setTrialFormat] = useState<LessonFormat>("in_person");
   const [trialAmount, setTrialAmount] = useState("35");
   const [trialWaive, setTrialWaive] = useState(false);
   const [trialMarkPaid, setTrialMarkPaid] = useState(true);
+  const [trialMarkComplete, setTrialMarkComplete] = useState(true);
   const [trialSendEmail, setTrialSendEmail] = useState(false);
   const [trialSummary, setTrialSummary] = useState("");
 
@@ -126,6 +143,21 @@ const AdminStudentDetail: React.FC = () => {
         em.enrollmentId === enrollment.id ||
         (email && em.to?.toLowerCase() === email)
     );
+  }, [enrollment, payload]);
+
+  const studentTrials: LessonBooking[] = useMemo(() => {
+    if (!enrollment || !payload) return [];
+    return (payload.bookings || [])
+      .filter(
+        (b) =>
+          b.lessonType === "trial" &&
+          b.status !== "cancelled" &&
+          (b.enrollmentId === enrollment.id ||
+            b.id === enrollment.trialBookingId ||
+            (b.email || "").toLowerCase() ===
+              (enrollment.email || "").toLowerCase())
+      )
+      .sort((a, b) => (b.start || "").localeCompare(a.start || ""));
   }, [enrollment, payload]);
 
   const onResend = async () => {
@@ -224,6 +256,8 @@ const AdminStudentDetail: React.FC = () => {
     }
 
     const whenLabel = `${formatSlotDay(start, TZ)} · ${formatSlotTime(start, TZ)}`;
+    const paid = trialWaive || trialMarkPaid;
+    const complete = paid && trialMarkComplete;
     const ok = await confirm("recordTrial", {
       name: enrollment.name,
       email: enrollment.email,
@@ -245,6 +279,7 @@ const AdminStudentDetail: React.FC = () => {
           amountDollars: trialWaive ? undefined : amountDollars,
           waive: trialWaive,
           markPaid: trialWaive ? true : trialMarkPaid,
+          markComplete: complete,
           sendEmail: trialSendEmail,
         },
         token
@@ -254,6 +289,31 @@ const AdminStudentDetail: React.FC = () => {
       setBusy("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not record trial.");
+      setBusy("");
+    }
+  };
+
+  const onCompleteTrial = async (booking: LessonBooking) => {
+    const token = getAdminToken();
+    if (!token || !enrollment) return;
+    const whenLabel = `${formatSlotDay(booking.start, TZ)} · ${formatSlotTime(booking.start, TZ)}`;
+    const ok = await confirm("completeTrial", {
+      name: enrollment.name,
+      email: enrollment.email,
+      whenLabel,
+    });
+    if (!ok) return;
+    setBusy(`complete-${booking.id}`);
+    setError("");
+    try {
+      const result = await completeTrialBooking({ bookingId: booking.id }, token);
+      setTrialSummary(result.summary);
+      setPayload(await loadStudio({ includePrivate: true }));
+      setBusy("");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not mark trial complete."
+      );
       setBusy("");
     }
   };
@@ -653,7 +713,11 @@ const AdminStudentDetail: React.FC = () => {
                       type="checkbox"
                       className="mt-1"
                       checked={trialMarkPaid}
-                      onChange={(e) => setTrialMarkPaid(e.target.checked)}
+                      onChange={(e) => {
+                        const paid = e.target.checked;
+                        setTrialMarkPaid(paid);
+                        if (!paid) setTrialMarkComplete(false);
+                      }}
                     />
                     <span>
                       <span className="font-medium">Mark as paid</span>
@@ -664,6 +728,27 @@ const AdminStudentDetail: React.FC = () => {
                     </span>
                   </label>
                 ) : null}
+                <label
+                  className={`flex items-start gap-3 text-sm ${
+                    trialWaive || trialMarkPaid
+                      ? "cursor-pointer"
+                      : "opacity-50 pointer-events-none"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={trialMarkComplete && (trialWaive || trialMarkPaid)}
+                    onChange={(e) => setTrialMarkComplete(e.target.checked)}
+                    disabled={!trialWaive && !trialMarkPaid}
+                  />
+                  <span>
+                    <span className="font-medium">Mark as completed</span>
+                    <span className="block text-muted text-xs mt-0.5">
+                      Lesson happened — shows as completed on their schedule.
+                    </span>
+                  </span>
+                </label>
                 <label className="flex items-start gap-3 text-sm cursor-pointer">
                   <input
                     type="checkbox"
@@ -691,6 +776,55 @@ const AdminStudentDetail: React.FC = () => {
                   {busy === "trial" ? "Saving…" : "Record trial"}
                 </button>
               </form>
+
+              {studentTrials.length > 0 ? (
+                <div className="border-t border-line pt-5 space-y-3">
+                  <h3 className="font-display text-xl">Existing trials</h3>
+                  <ul className="space-y-2">
+                    {studentTrials.map((b) => (
+                      <li
+                        key={b.id}
+                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border border-line px-3 py-3 text-sm"
+                      >
+                        <div>
+                          <p className="font-medium">
+                            {formatSlotDay(b.start, TZ)} ·{" "}
+                            {formatSlotTime(b.start, TZ)}
+                          </p>
+                          <p className="text-muted text-xs mt-0.5">
+                            {b.durationMinutes} min
+                            {b.format === "online" ? " · online" : " · in person"}
+                            {" · "}
+                            {b.status === "completed"
+                              ? "completed"
+                              : b.status === "pending_payment"
+                                ? "awaiting payment"
+                                : "scheduled"}
+                            {typeof b.amountCents === "number"
+                              ? ` · $${(b.amountCents / 100).toFixed(
+                                  b.amountCents % 100 === 0 ? 0 : 2
+                                )}`
+                              : ""}
+                          </p>
+                        </div>
+                        {b.status !== "completed" &&
+                        b.status !== "pending_payment" ? (
+                          <button
+                            type="button"
+                            className="btn-secondary text-xs shrink-0"
+                            disabled={busy === `complete-${b.id}`}
+                            onClick={() => onCompleteTrial(b)}
+                          >
+                            {busy === `complete-${b.id}`
+                              ? "Saving…"
+                              : "Mark complete"}
+                          </button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
             </section>
           ) : null}
 
