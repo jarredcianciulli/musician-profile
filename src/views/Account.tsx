@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   clearAccountSessionToken,
@@ -16,8 +16,17 @@ import {
   downloadIcs,
   googleCalendarUrlForLesson,
 } from "../lib/accountCalendar";
+import {
+  filterSchedule,
+  paginateRows,
+  scheduleDateBounds,
+  SCHEDULE_PAGE_SIZE,
+  type ScheduleKindFilter,
+} from "../lib/accountScheduleFilters";
 import { formatSlotDay, formatSlotTime } from "../lib/slots";
 import { marketingSiteUrl, studioEmail } from "../lib/env";
+
+const SCHEDULE_COLLAPSE_KEY = "bss_account_schedule_open";
 
 const TZ = "America/New_York";
 
@@ -56,8 +65,107 @@ const Account: React.FC = () => {
   const [checkoutBusy, setCheckoutBusy] = useState<"auto" | "manual" | null>(
     null
   );
+  const [kindFilter, setKindFilter] = useState<ScheduleKindFilter>("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [schedulePage, setSchedulePage] = useState(1);
+  const [scheduleOpen, setScheduleOpen] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const paidBanner = searchParams.get("paid") === "1";
   const canceledBanner = searchParams.get("canceled") === "1";
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(SCHEDULE_COLLAPSE_KEY);
+      if (raw === "0") setScheduleOpen(false);
+      if (raw === "1") setScheduleOpen(true);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SCHEDULE_COLLAPSE_KEY, scheduleOpen ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [scheduleOpen]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        setInfoOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!data?.enrollment?.id || !data.schedule) return;
+    const bounds = scheduleDateBounds(data.schedule);
+    setDateFrom(bounds.from);
+    setDateTo(bounds.to);
+    setKindFilter("all");
+    setSchedulePage(1);
+  }, [data?.enrollment?.id]);
+
+  useEffect(() => {
+    setSchedulePage(1);
+  }, [kindFilter, dateFrom, dateTo]);
+
+  const scheduleRows = useMemo(
+    () => data?.schedule || [],
+    [data?.schedule]
+  );
+
+  const filteredSchedule = useMemo(
+    () =>
+      filterSchedule(scheduleRows, {
+        kind: kindFilter,
+        from: dateFrom,
+        to: dateTo,
+      }),
+    [scheduleRows, kindFilter, dateFrom, dateTo]
+  );
+
+  const {
+    pageRows: pagedSchedule,
+    total: filteredCount,
+    page: safePage,
+    pageCount,
+  } = useMemo(
+    () => paginateRows(filteredSchedule, schedulePage, SCHEDULE_PAGE_SIZE),
+    [filteredSchedule, schedulePage]
+  );
+
+  const exportLessons = useMemo(
+    () =>
+      filterSchedule(scheduleRows, {
+        kind: "lessons",
+        from: dateFrom,
+        to: dateTo,
+      })
+        .filter((row) => row.start && row.end)
+        .map((row) => ({
+          start: row.start,
+          end: row.end as string,
+          title: row.title,
+        })),
+    [scheduleRows, dateFrom, dateTo]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -221,38 +329,34 @@ const Account: React.FC = () => {
             </button>
           </form>
         </details>
-        <p className="text-sm text-muted mt-8">
-          <a
-            href={marketingSiteUrl()}
-            className="underline underline-offset-2"
-          >
-            Studio website
-          </a>
-        </p>
       </div>
     );
   }
 
-  const { enrollment, schedule, billingItems, payments } = data;
+  const { enrollment, billingItems, payments } = data;
   const due = enrollment.amountDueCents || 0;
   const mode = enrollment.billingMode || "manual";
   const autoReady = mode === "auto" && Boolean(enrollment.stripeSubscriptionId);
   const showAutoSetup = mode === "auto" && !enrollment.stripeSubscriptionId;
   const showManualPay = mode === "manual" || mode === "unset";
   const showChoice = mode === "unset";
-
-  const lessonsOnly = (schedule || [])
-    .filter((row) => row.type === "lesson" && row.start && row.end)
-    .map((row) => ({
-      start: row.start,
-      end: row.end as string,
-      title: row.title,
-    }));
+  const scheduleBounds = scheduleDateBounds(scheduleRows);
   const lessonTitle = `Lesson — ${enrollment.name}`;
   const billingRows = billingItems || [];
+  const filtersActive =
+    kindFilter !== "all" ||
+    dateFrom !== scheduleBounds.from ||
+    dateTo !== scheduleBounds.to;
+
+  const clearScheduleFilters = () => {
+    setKindFilter("all");
+    setDateFrom(scheduleBounds.from);
+    setDateTo(scheduleBounds.to);
+    setSchedulePage(1);
+  };
 
   const downloadAllCalendars = () => {
-    const ics = buildLessonsIcs(lessonsOnly, {
+    const ics = buildLessonsIcs(exportLessons, {
       name: enrollment.name,
       calendarName: `BSS — ${enrollment.name}`,
     });
@@ -261,6 +365,13 @@ const Account: React.FC = () => {
       ics
     );
   };
+
+  const billingLabel =
+    enrollment.billingMode === "auto"
+      ? "Auto-charge monthly"
+      : enrollment.billingMode === "manual"
+        ? "Pay by link"
+        : "Not set";
 
   return (
     <div className="section-container py-12 max-w-2xl">
@@ -274,14 +385,144 @@ const Account: React.FC = () => {
           </h1>
           <p className="text-muted text-sm mt-1">{enrollment.email}</p>
         </div>
-        <button
-          type="button"
-          onClick={signOut}
-          className="text-xs text-muted underline underline-offset-2 shrink-0"
-        >
-          Sign out
-        </button>
+        <div className="relative shrink-0" ref={menuRef}>
+          <button
+            type="button"
+            className="btn-secondary text-xs"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            onClick={() => setMenuOpen((o) => !o)}
+          >
+            Menu
+          </button>
+          {menuOpen ? (
+            <div
+              role="menu"
+              className="absolute right-0 mt-2 w-52 border border-line bg-white shadow-sm z-20 py-1 text-sm"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                className="w-full text-left px-4 py-2.5 hover:bg-paper-muted"
+                onClick={() => {
+                  setInfoOpen(true);
+                  setMenuOpen(false);
+                }}
+              >
+                Account info
+              </button>
+              <a
+                role="menuitem"
+                className="block px-4 py-2.5 hover:bg-paper-muted text-ink"
+                href={marketingSiteUrl()}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => setMenuOpen(false)}
+              >
+                Studio website
+              </a>
+              <button
+                type="button"
+                role="menuitem"
+                className="w-full text-left px-4 py-2.5 hover:bg-paper-muted text-muted"
+                onClick={() => {
+                  setMenuOpen(false);
+                  signOut();
+                }}
+              >
+                Sign out
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
+
+      {infoOpen ? (
+        <div
+          className="fixed inset-0 z-30 flex items-end sm:items-center justify-center bg-ink/30 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="account-info-title"
+          onClick={() => setInfoOpen(false)}
+        >
+          <div
+            className="bg-white border border-line w-full max-w-md p-5 space-y-4 shadow-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <h2
+                id="account-info-title"
+                className="font-display text-2xl"
+              >
+                Account info
+              </h2>
+              <button
+                type="button"
+                className="text-xs text-muted underline underline-offset-2"
+                onClick={() => setInfoOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+            <p className="text-xs text-muted">
+              Read-only — contact the studio to change these.
+            </p>
+            <dl className="text-sm space-y-3">
+              <div>
+                <dt className="text-xs uppercase tracking-wider text-muted">
+                  Name
+                </dt>
+                <dd>{enrollment.name}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wider text-muted">
+                  Email
+                </dt>
+                <dd>{enrollment.email}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wider text-muted">
+                  Lesson
+                </dt>
+                <dd>
+                  {enrollment.durationMinutes} min ·{" "}
+                  {enrollment.format === "online" ? "Online" : "In person"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wider text-muted">
+                  Weekly time
+                </dt>
+                <dd>
+                  {formatSlotDay(enrollment.slotStart, TZ)} ·{" "}
+                  {formatSlotTime(enrollment.slotStart, TZ)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wider text-muted">
+                  Billing
+                </dt>
+                <dd>{billingLabel}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wider text-muted">
+                  Schedule shown
+                </dt>
+                <dd>{enrollment.scheduleMonths || 12} months ahead</dd>
+              </div>
+            </dl>
+            <p className="text-xs text-muted pt-1">
+              Need a change?{" "}
+              <a
+                className="underline underline-offset-2"
+                href={`mailto:${studioEmail()}`}
+              >
+                {studioEmail()}
+              </a>
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       {paidBanner ? (
         <p className="text-sm border border-line bg-paper-muted/50 px-4 py-3 mb-6">
@@ -300,16 +541,27 @@ const Account: React.FC = () => {
       ) : null}
 
       <section className="mb-10">
-        <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
-          <div>
-            <h2 className="font-display text-2xl">Schedule</h2>
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+          <button
+            type="button"
+            className="text-left group"
+            aria-expanded={scheduleOpen}
+            onClick={() => setScheduleOpen((o) => !o)}
+          >
+            <h2 className="font-display text-2xl group-hover:text-sky-ink">
+              Schedule{" "}
+              <span className="text-sm font-sans text-muted font-normal">
+                {scheduleOpen ? "▾" : "▸"}
+              </span>
+            </h2>
             <p className="text-sm text-muted mt-1">
               {enrollment.durationMinutes}-minute{" "}
               {enrollment.format === "online" ? "online" : "in-person"} · next{" "}
               {enrollment.scheduleMonths || 12} months
+              {!scheduleOpen ? " · collapsed" : ""}
             </p>
-          </div>
-          {lessonsOnly.length > 0 ? (
+          </button>
+          {scheduleOpen && exportLessons.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -325,11 +577,11 @@ const Account: React.FC = () => {
               >
                 Google Calendar (.ics)
               </button>
-              {lessonsOnly[0] ? (
+              {exportLessons[0] ? (
                 <a
                   className="btn-secondary text-xs inline-flex items-center"
                   href={googleCalendarUrlForLesson(
-                    lessonsOnly[0],
+                    exportLessons[0],
                     lessonTitle
                   )}
                   target="_blank"
@@ -341,66 +593,182 @@ const Account: React.FC = () => {
             </div>
           ) : null}
         </div>
-        <p className="text-xs text-muted mb-3">
-          Download .ics once, then open in Apple Calendar or import in Google
-          Calendar (Settings → Import).
+
+        {scheduleOpen ? (
+          <>
+        <p className="text-xs text-muted mb-4">
+          Download .ics for lessons in the date range below (Apple Calendar or
+          Google Calendar → Settings → Import).
         </p>
-        {(schedule || []).length === 0 ? (
+
+        {scheduleRows.length === 0 ? (
           <p className="text-sm text-ink-soft">No upcoming times listed yet.</p>
         ) : (
-          <div className="border border-line bg-white overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="border-b border-line text-xs uppercase tracking-wider text-muted">
-                <tr>
-                  <th className="px-3 py-2 font-medium">Date</th>
-                  <th className="px-3 py-2 font-medium">Type</th>
-                  <th className="px-3 py-2 font-medium">Time / note</th>
-                  <th className="px-3 py-2 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {schedule.map((row) => {
-                  const isOff =
-                    row.type === "holiday" || row.type === "break";
-                  return (
-                    <tr
-                      key={`${row.type}-${row.start}`}
-                      className={`border-b border-line/70 last:border-0 ${
-                        isOff ? "bg-paper-muted/40" : ""
-                      }`}
-                    >
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        {formatSlotDay(row.start, TZ)}
-                      </td>
-                      <td className="px-3 py-2 capitalize">
-                        {row.type === "lesson"
-                          ? "Lesson"
-                          : row.type === "break"
-                            ? "Break"
-                            : "Holiday"}
-                      </td>
-                      <td className="px-3 py-2 text-ink-soft">
-                        {isOff
-                          ? row.title ||
-                            (row.holidayStart && row.holidayEnd
-                              ? `${row.holidayStart} → ${row.holidayEnd}`
-                              : "Studio closed")
-                          : `${formatSlotTime(row.start, TZ)}${
-                              row.end
-                                ? ` – ${formatSlotTime(row.end, TZ)}`
-                                : ""
+          <>
+            <div className="border border-line bg-white p-4 mb-3 space-y-3">
+              <div
+                className="flex flex-wrap gap-1"
+                role="group"
+                aria-label="Schedule kind"
+              >
+                {(
+                  [
+                    { id: "all" as const, label: "All dates" },
+                    { id: "lessons" as const, label: "Lessons" },
+                    { id: "closed" as const, label: "Studio closed" },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={`px-3 py-1.5 text-xs border transition-colors ${
+                      kindFilter === opt.id
+                        ? "border-sky-ink bg-paper-muted text-ink font-medium"
+                        : "border-line text-muted hover:text-ink"
+                    }`}
+                    onClick={() => setKindFilter(opt.id)}
+                    aria-pressed={kindFilter === opt.id}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="text-sm block">
+                  <span className="text-muted text-xs uppercase tracking-wider">
+                    From
+                  </span>
+                  <input
+                    type="date"
+                    className="admin-input mt-1 w-full"
+                    value={dateFrom}
+                    max={dateTo || undefined}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                  />
+                </label>
+                <label className="text-sm block">
+                  <span className="text-muted text-xs uppercase tracking-wider">
+                    To
+                  </span>
+                  <input
+                    type="date"
+                    className="admin-input mt-1 w-full"
+                    value={dateTo}
+                    min={dateFrom || undefined}
+                    onChange={(e) => setDateTo(e.target.value)}
+                  />
+                </label>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+                <span>
+                  {filteredCount} matching
+                  {filtersActive ? " (filtered)" : ""}
+                </span>
+                {filtersActive ? (
+                  <button
+                    type="button"
+                    className="underline underline-offset-2 hover:text-ink"
+                    onClick={clearScheduleFilters}
+                  >
+                    Clear filters
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            {filteredCount === 0 ? (
+              <p className="text-sm text-ink-soft border border-line bg-white px-4 py-6">
+                No dates match these filters.
+              </p>
+            ) : (
+              <>
+                <div className="border border-line bg-white overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="border-b border-line text-xs uppercase tracking-wider text-muted">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">Date</th>
+                        <th className="px-3 py-2 font-medium">Type</th>
+                        <th className="px-3 py-2 font-medium">Time / note</th>
+                        <th className="px-3 py-2 font-medium">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagedSchedule.map((row) => {
+                        const isOff =
+                          row.type === "holiday" || row.type === "break";
+                        return (
+                          <tr
+                            key={`${row.type}-${row.start}`}
+                            className={`border-b border-line/70 last:border-0 ${
+                              isOff ? "bg-paper-muted/40" : ""
                             }`}
-                      </td>
-                      <td className="px-3 py-2">
-                        {statusLabel(row.status || row.type)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                          >
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              {formatSlotDay(row.start, TZ)}
+                            </td>
+                            <td className="px-3 py-2 capitalize">
+                              {row.type === "lesson"
+                                ? "Lesson"
+                                : row.type === "break"
+                                  ? "Break"
+                                  : "Holiday"}
+                            </td>
+                            <td className="px-3 py-2 text-ink-soft">
+                              {isOff
+                                ? row.title ||
+                                  (row.holidayStart && row.holidayEnd
+                                    ? `${row.holidayStart} → ${row.holidayEnd}`
+                                    : "Studio closed")
+                                : `${formatSlotTime(row.start, TZ)}${
+                                    row.end
+                                      ? ` – ${formatSlotTime(row.end, TZ)}`
+                                      : ""
+                                  }`}
+                            </td>
+                            <td className="px-3 py-2">
+                              {statusLabel(row.status || row.type)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 mt-3 text-sm text-muted">
+                  <span>
+                    Showing{" "}
+                    {(safePage - 1) * SCHEDULE_PAGE_SIZE + 1}
+                    –
+                    {Math.min(safePage * SCHEDULE_PAGE_SIZE, filteredCount)} of{" "}
+                    {filteredCount}
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="btn-secondary text-xs"
+                      disabled={safePage <= 1}
+                      onClick={() => setSchedulePage((p) => Math.max(1, p - 1))}
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary text-xs"
+                      disabled={safePage >= pageCount}
+                      onClick={() =>
+                        setSchedulePage((p) => Math.min(pageCount, p + 1))
+                      }
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </>
         )}
+          </>
+        ) : null}
       </section>
 
       <section className="mb-10">
