@@ -439,6 +439,141 @@ export async function handleStudentRoutes({
     return json({ ok: true, magicUrl }, 200, origin);
   }
 
+  // ——— Admin: cancel pending invite ———
+  if (request.method === "POST" && route === "/studio/students/cancel-invite") {
+    if (!adminOk()) return json({ error: "Unauthorized" }, 401, origin);
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ error: "Invalid JSON" }, 400, origin);
+    }
+    const enrollmentId = String(body?.enrollmentId || "").trim();
+    if (!enrollmentId) {
+      return json({ error: "enrollmentId required." }, 400, origin);
+    }
+    let payload = await readPayload(env);
+    let enrollment = (payload.enrollments || []).find((e) => e.id === enrollmentId);
+    if (!enrollment) return json({ error: "Enrollment not found" }, 404, origin);
+
+    const isPending =
+      enrollment.status === "invited" ||
+      (!enrollment.stripeSubscriptionId && !enrollment.paidThroughPeriodKey);
+    if (!isPending || enrollment.status === "cancelled") {
+      return json(
+        { error: "Only pending invites can be cancelled." },
+        400,
+        origin
+      );
+    }
+
+    const cleared = await invalidatePendingCheckout(env, payload, enrollment);
+    enrollment = cleared.enrollment;
+    payload = { ...payload, payments: cleared.payments };
+
+    enrollment = {
+      ...enrollment,
+      status: "cancelled",
+      magicTokenHash: "",
+      sessionTokenHash: "",
+      pendingCheckoutSessionId: "",
+      pendingCheckoutMode: "",
+      cancelledAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    payload = updateEnrollment(payload, enrollment);
+    await writePayload(env, payload);
+    return json({ ok: true, enrollment }, 200, origin);
+  }
+
+  // ——— Admin: update enrollment fields ———
+  if (request.method === "POST" && route === "/studio/students/update") {
+    if (!adminOk()) return json({ error: "Unauthorized" }, 401, origin);
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ error: "Invalid JSON" }, 400, origin);
+    }
+    const enrollmentId = String(body?.enrollmentId || "").trim();
+    if (!enrollmentId) {
+      return json({ error: "enrollmentId required." }, 400, origin);
+    }
+    let payload = await readPayload(env);
+    let enrollment = (payload.enrollments || []).find((e) => e.id === enrollmentId);
+    if (!enrollment) return json({ error: "Enrollment not found" }, 404, origin);
+    if (enrollment.status === "cancelled") {
+      return json({ error: "Cannot edit a cancelled invite." }, 400, origin);
+    }
+
+    const next = { ...enrollment };
+    if (body.name != null) next.name = String(body.name).trim() || next.name;
+    if (body.email != null) {
+      next.email = String(body.email).trim().toLowerCase() || next.email;
+    }
+    if (body.format === "online" || body.format === "in_person") {
+      next.format = body.format;
+    }
+    if (
+      body.billingMode === "auto" ||
+      body.billingMode === "manual" ||
+      body.billingMode === "unset"
+    ) {
+      next.billingMode = body.billingMode;
+    }
+    if (body.scheduleMonths != null) {
+      const m = Number(body.scheduleMonths);
+      if (Number.isFinite(m) && m >= 1 && m <= 24) next.scheduleMonths = Math.round(m);
+    }
+    if (body.adminNotes != null) {
+      next.adminNotes = String(body.adminNotes).slice(0, 4000);
+    }
+    if (body.durationMinutes != null) {
+      const d = Number(body.durationMinutes);
+      if (d === 30 || d === 45 || d === 60) next.durationMinutes = d;
+    }
+    if (body.start && body.end) {
+      next.slotStart = String(body.start);
+      next.slotEnd = String(body.end);
+      next.weekday = weekdayFromDate(next.slotStart);
+    }
+    if (body.amountDollars != null && String(body.amountDollars).trim() !== "") {
+      const dollars = Number(body.amountDollars);
+      if (!Number.isFinite(dollars) || dollars < 0 || dollars > 5000) {
+        return json(
+          { error: "amountDollars must be between 0 and 5000." },
+          400,
+          origin
+        );
+      }
+      next.amountDueCents = Math.round(dollars * 100);
+      next.amountDueLocked = true;
+    }
+    if (body.clearAmountDue === true) {
+      next.amountDueLocked = false;
+    }
+
+    next.updatedAt = new Date().toISOString();
+    let toSave = refreshEnrollmentDue(
+      next,
+      payload.availability?.weeklyHours
+    );
+    delete toSave._proration;
+
+    if (
+      enrollment.amountDueCents !== toSave.amountDueCents ||
+      enrollment.amountDueLocked !== toSave.amountDueLocked
+    ) {
+      const cleared = await invalidatePendingCheckout(env, payload, toSave);
+      toSave = cleared.enrollment;
+      payload = { ...payload, payments: cleared.payments };
+    }
+
+    payload = updateEnrollment(payload, toSave);
+    await writePayload(env, payload);
+    return json({ ok: true, enrollment: toSave }, 200, origin);
+  }
+
   // ——— Magic link exchange ———
   if (request.method === "GET" && route === "/studio/account/session") {
     const token = url.searchParams.get("token") || "";

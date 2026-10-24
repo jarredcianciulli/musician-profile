@@ -97,6 +97,7 @@ export type StudioSubscription = {
   format?: LessonFormat;
   policyAcceptedAt?: string;
   reservationId?: string;
+  enrollmentId?: string;
   emailsSentAt?: string;
   emailError?: string;
   /** auto = Stripe subscription; manual = pay-by-link each month */
@@ -157,7 +158,7 @@ export type StudentEnrollment = {
   durationMinutes: number;
   format?: LessonFormat;
   weekday?: number;
-  status: "invited" | "active" | string;
+  status: "invited" | "active" | "cancelled" | string;
   billingMode: StudentBillingMode | string;
   amountDueCents: number;
   /** When true, amountDueCents is an admin override (not auto-recalculated). */
@@ -173,7 +174,11 @@ export type StudentEnrollment = {
   scheduleMonths?: number;
   /** ISO timestamp when student agreed to studio policy (portal or subscribe). */
   policyAcceptedAt?: string;
+  /** Admin-only freeform notes (custom info widget). */
+  adminNotes?: string;
   createdAt?: string;
+  updatedAt?: string;
+  cancelledAt?: string;
 };
 
 export type StudentPayment = {

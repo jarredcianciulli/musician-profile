@@ -550,6 +550,61 @@ export async function setStudentAmountDue(
   return data as { ok: boolean; enrollment: StudentEnrollment };
 }
 
+/** Admin: cancel a pending invite (not yet paid / no subscription). */
+export async function cancelStudentInvite(
+  enrollmentId: string,
+  adminToken: string
+): Promise<{ ok: boolean; enrollment: StudentEnrollment }> {
+  if (!apiBase) throw new Error("Requires the studio API.");
+  const res = await fetch(`${apiBase}/studio/students/cancel-invite`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${adminToken}`,
+    },
+    body: JSON.stringify({ enrollmentId }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not cancel invite.");
+  }
+  return data as { ok: boolean; enrollment: StudentEnrollment };
+}
+
+/** Admin: update enrollment fields (detail edit page). */
+export async function updateStudentEnrollment(
+  enrollmentId: string,
+  patch: {
+    name?: string;
+    email?: string;
+    format?: LessonFormat;
+    billingMode?: "auto" | "manual" | "unset";
+    scheduleMonths?: number;
+    adminNotes?: string;
+    durationMinutes?: 30 | 45 | 60;
+    start?: string;
+    end?: string;
+    amountDollars?: number;
+    clearAmountDue?: boolean;
+  },
+  adminToken: string
+): Promise<{ ok: boolean; enrollment: StudentEnrollment }> {
+  if (!apiBase) throw new Error("Requires the studio API.");
+  const res = await fetch(`${apiBase}/studio/students/update`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${adminToken}`,
+    },
+    body: JSON.stringify({ enrollmentId, ...patch }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not update student.");
+  }
+  return data as { ok: boolean; enrollment: StudentEnrollment };
+}
+
 /** Admin-authenticated Checkout / Payment Link for a student. */
 export async function createAdminSubscriptionCheckout(
   input: {

@@ -31,6 +31,7 @@ import {
 } from "../types/studio";
 import { siteUrl } from "../lib/env";
 import {
+  cancelStudentInvite,
   fetchSubscriptionSlots,
   inviteStudent,
   resendStudentMagicLink,
@@ -38,6 +39,7 @@ import {
   updateLeadStatus,
   type StudentInviteResult,
 } from "../lib/bookingApi";
+import { nextLessonStartIso } from "../lib/studentSchedule";
 import {
   DEFAULT_SUBSCRIPTION_MINUTES,
   SUBSCRIPTION_DURATIONS,
@@ -130,6 +132,7 @@ const Admin: React.FC = () => {
   );
   const [inviteError, setInviteError] = useState("");
   const [resendBusyId, setResendBusyId] = useState("");
+  const [cancelBusyId, setCancelBusyId] = useState("");
   const [dueDrafts, setDueDrafts] = useState<Record<string, string>>({});
   const [dueBusyId, setDueBusyId] = useState("");
   const [pendingMagicUrls, setPendingMagicUrls] = useState<
@@ -347,6 +350,37 @@ const Admin: React.FC = () => {
       );
     } finally {
       setDueBusyId("");
+    }
+  };
+
+  const cancelInvite = async (enrollmentId: string, name: string) => {
+    const token = getAdminToken();
+    if (!token) {
+      setStatus("Re-login required.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Cancel invite for ${name}? Their magic link will stop working.`
+      )
+    ) {
+      return;
+    }
+    setCancelBusyId(enrollmentId);
+    try {
+      await cancelStudentInvite(enrollmentId, token);
+      const refreshed = await loadStudio({ includePrivate: true });
+      setPayload(refreshed);
+      setPendingMagicUrls((prev) => {
+        const next = { ...prev };
+        delete next[enrollmentId];
+        return next;
+      });
+      setStatus(`Cancelled invite for ${name}.`);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Could not cancel invite.");
+    } finally {
+      setCancelBusyId("");
     }
   };
 
@@ -585,7 +619,10 @@ const Admin: React.FC = () => {
     .filter((b) => b.status !== "cancelled")
     .sort((a, b) => a.start.localeCompare(b.start));
 
-  const enrollments = payload.enrollments || [];
+  const enrollments = (payload.enrollments || []).filter(
+    (e) => e.status !== "cancelled"
+  );
+  const holidays = payload.holidays || [];
   const pendingInvites = enrollments.filter((e) => {
     if (e.status === "invited") return true;
     // Invited / not yet paid for the period, and no active auto subscription
@@ -1131,7 +1168,12 @@ const Admin: React.FC = () => {
                   .sort((a, b) =>
                     (b.createdAt || "").localeCompare(a.createdAt || "")
                   )
-                  .map((enr) => (
+                  .map((enr) => {
+                    const nextLesson = nextLessonStartIso(
+                      enr.slotStart,
+                      holidays
+                    );
+                    return (
                     <li
                       key={enr.id}
                       className="bg-white border border-line px-4 py-3 space-y-3 text-sm"
@@ -1152,22 +1194,44 @@ const Admin: React.FC = () => {
                               : ""}
                           </p>
                           <p className="text-xs text-muted mt-0.5">
-                            {formatSlotDay(enr.slotStart, tz)} ·{" "}
-                            {formatSlotTime(enr.slotStart, tz)} · {enr.status}
+                            Start {formatSlotDay(enr.slotStart, tz)} ·{" "}
+                            {formatSlotTime(enr.slotStart, tz)}
+                            {nextLesson
+                              ? ` · next ${formatSlotDay(nextLesson, tz)} ${formatSlotTime(nextLesson, tz)}`
+                              : ""}{" "}
+                            · {enr.status}
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          className="btn-primary shrink-0 text-xs"
-                          disabled={resendBusyId === enr.id}
-                          onClick={() => resendInvite(enr.id)}
-                        >
-                          {resendBusyId === enr.id
-                            ? "Sending…"
-                            : pendingMagicUrls[enr.id]
-                              ? "Resend new link"
-                              : "Generate / resend link"}
-                        </button>
+                        <div className="flex flex-wrap gap-2 shrink-0">
+                          <Link
+                            href={`/admin/students/${enr.id}`}
+                            className="btn-secondary text-xs"
+                          >
+                            Open
+                          </Link>
+                          <button
+                            type="button"
+                            className="btn-primary text-xs"
+                            disabled={resendBusyId === enr.id}
+                            onClick={() => resendInvite(enr.id)}
+                          >
+                            {resendBusyId === enr.id
+                              ? "Sending…"
+                              : pendingMagicUrls[enr.id]
+                                ? "Resend new link"
+                                : "Generate / resend link"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-secondary text-xs text-accent"
+                            disabled={cancelBusyId === enr.id}
+                            onClick={() => cancelInvite(enr.id, enr.name)}
+                          >
+                            {cancelBusyId === enr.id
+                              ? "Cancelling…"
+                              : "Cancel invite"}
+                          </button>
+                        </div>
                       </div>
                       <div>
                         <p className="text-xs uppercase tracking-wider text-muted mb-1">
@@ -1255,7 +1319,8 @@ const Admin: React.FC = () => {
                         </p>
                       )}
                     </li>
-                  ))}
+                    );
+                  })}
               </ul>
             </div>
           ) : null}
@@ -1268,7 +1333,12 @@ const Admin: React.FC = () => {
                   .sort((a, b) =>
                     (b.createdAt || "").localeCompare(a.createdAt || "")
                   )
-                  .map((enr) => (
+                  .map((enr) => {
+                    const nextLesson = nextLessonStartIso(
+                      enr.slotStart,
+                      holidays
+                    );
+                    return (
                     <li
                       key={enr.id}
                       className="bg-white border border-line px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm"
@@ -1283,22 +1353,35 @@ const Admin: React.FC = () => {
                             : ""}
                         </p>
                         <p className="text-xs text-muted mt-0.5">
-                          {formatSlotDay(enr.slotStart, tz)} ·{" "}
-                          {formatSlotTime(enr.slotStart, tz)} · {enr.status}
+                          Start {formatSlotDay(enr.slotStart, tz)} ·{" "}
+                          {formatSlotTime(enr.slotStart, tz)}
+                          {nextLesson
+                            ? ` · next ${formatSlotDay(nextLesson, tz)} ${formatSlotTime(nextLesson, tz)}`
+                            : ""}{" "}
+                          · {enr.status}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        className="btn-secondary shrink-0 text-xs"
-                        disabled={resendBusyId === enr.id}
-                        onClick={() => resendInvite(enr.id)}
-                      >
-                        {resendBusyId === enr.id
-                          ? "Sending…"
-                          : "Resend magic link"}
-                      </button>
+                      <div className="flex flex-wrap gap-2 shrink-0">
+                        <Link
+                          href={`/admin/students/${enr.id}`}
+                          className="btn-primary text-xs"
+                        >
+                          Open
+                        </Link>
+                        <button
+                          type="button"
+                          className="btn-secondary text-xs"
+                          disabled={resendBusyId === enr.id}
+                          onClick={() => resendInvite(enr.id)}
+                        >
+                          {resendBusyId === enr.id
+                            ? "Sending…"
+                            : "Resend magic link"}
+                        </button>
+                      </div>
                     </li>
-                  ))}
+                    );
+                  })}
               </ul>
             </div>
           ) : null}
@@ -1382,7 +1465,17 @@ const Admin: React.FC = () => {
                 .sort((a, b) =>
                   (b.createdAt || "").localeCompare(a.createdAt || "")
                 )
-                .map((s) => (
+                .map((s) => {
+                  const matched = enrollments.find(
+                    (e) =>
+                      e.id === s.enrollmentId ||
+                      e.email?.toLowerCase() === s.email?.toLowerCase()
+                  );
+                  const startIso = matched?.slotStart || s.slotStart || "";
+                  const nextLesson = startIso
+                    ? nextLessonStartIso(startIso, holidays)
+                    : null;
+                  return (
                   <li
                     key={s.id}
                     className="bg-white border border-line px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
@@ -1390,9 +1483,9 @@ const Admin: React.FC = () => {
                     <div>
                       <p className="font-medium">{s.name}</p>
                       <p className="text-sm text-muted">
-                        {s.slotStart
-                          ? `${formatSlotDay(s.slotStart, tz)} · ${formatSlotTime(s.slotStart, tz)}`
-                          : "Slot TBD"}{" "}
+                        {startIso
+                          ? `Start ${formatSlotDay(startIso, tz)} · ${formatSlotTime(startIso, tz)}`
+                          : "Start TBD"}{" "}
                         ({s.durationMinutes} min)
                         {s.format === "online"
                           ? " · online"
@@ -1400,6 +1493,13 @@ const Admin: React.FC = () => {
                             ? " · in person"
                             : ""}
                       </p>
+                      {nextLesson ? (
+                        <p className="text-sm text-muted">
+                          Next lesson{" "}
+                          {formatSlotDay(nextLesson, tz)} ·{" "}
+                          {formatSlotTime(nextLesson, tz)}
+                        </p>
+                      ) : null}
                       <p className="text-sm text-muted">{s.email}</p>
                       <p className="text-xs text-muted mt-1">
                         Billing:{" "}
@@ -1430,12 +1530,23 @@ const Admin: React.FC = () => {
                         </p>
                       ) : null}
                     </div>
-                    <span className="text-xs uppercase tracking-wider text-sky-deep">
-                      {s.status}
-                      {s.billingMode === "manual" ? " · manual" : ""}
-                    </span>
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <span className="text-xs uppercase tracking-wider text-sky-deep">
+                        {s.status}
+                        {s.billingMode === "manual" ? " · manual" : ""}
+                      </span>
+                      {matched ? (
+                        <Link
+                          href={`/admin/students/${matched.id}`}
+                          className="btn-secondary text-xs"
+                        >
+                          Open
+                        </Link>
+                      ) : null}
+                    </div>
                   </li>
-                ))}
+                  );
+                })}
             </ul>
           )}
         </section>
