@@ -15,8 +15,9 @@ id = "628e269674a74751b113c64d7dbd7a33"
 
 [vars]
 WEBSITE_DOMAIN = "https://batterystringstudio.com"
-# Student portal host (magic links + Stripe return). Point DNS/tunnel here.
-ACCOUNT_DOMAIN = "https://account.batterystringstudio.com"
+# After DNS + Caddy for account.* are live, set:
+# ACCOUNT_DOMAIN = "https://account.batterystringstudio.com"
+ACCOUNT_DOMAIN = ""
 # Comma-separated extra CORS origins (staging, www, local, account portal)
 CORS_ORIGINS = "https://batterystringstudio.com,https://www.batterystringstudio.com,https://staging.batterystringstudio.com,https://account.batterystringstudio.com,https://account-staging.batterystringstudio.com,http://localhost:3000"
 FROM_EMAIL = "jarred@batterystringstudio.com"
@@ -41,7 +42,9 @@ id = "73816b8d49a54fe490cbc13161e6dfb6"
 
 [env.staging.vars]
 WEBSITE_DOMAIN = "https://staging.batterystringstudio.com"
-ACCOUNT_DOMAIN = "https://account-staging.batterystringstudio.com"
+# After DNS + Caddy for account-staging.* are live, set:
+# ACCOUNT_DOMAIN = "https://account-staging.batterystringstudio.com"
+ACCOUNT_DOMAIN = ""
 CORS_ORIGINS = "https://staging.batterystringstudio.com,https://account-staging.batterystringstudio.com,http://localhost:3000"
 FROM_EMAIL = "jarred@batterystringstudio.com"
 TO_EMAIL = "jarred@batterystringstudio.com"

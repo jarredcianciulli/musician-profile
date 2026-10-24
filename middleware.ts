@@ -48,9 +48,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(pathname + search, marketingBase));
   }
 
-  // Marketing host: prefer account subdomain when configured
+  // Optional: redirect marketing /account → dedicated host once DNS is live.
+  // Enable with NEXT_PUBLIC_ACCOUNT_REDIRECT=1 on the Docker build.
   if (
     accountBase &&
+    process.env.NEXT_PUBLIC_ACCOUNT_REDIRECT === "1" &&
     (pathname === "/account" || pathname.startsWith("/account/"))
   ) {
     return NextResponse.redirect(new URL(pathname + search, accountBase));
