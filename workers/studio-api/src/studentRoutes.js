@@ -617,6 +617,8 @@ export async function handleStudentRoutes({
           successUrl,
           cancelUrl,
           billingCycleAnchor: proration.billingCycleAnchor,
+          remainingLessons: proration.remainingLessons,
+          nextCycleStartIso: proration.nextCycleStartIso,
           metadata: {
             type: "enrollment_subscription",
             enrollmentId: enrollment.id,

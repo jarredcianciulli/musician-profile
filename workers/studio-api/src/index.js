@@ -1487,6 +1487,8 @@ export default {
             returnQuery
           ),
           billingCycleAnchor: proration.billingCycleAnchor,
+          remainingLessons: proration.remainingLessons,
+          nextCycleStartIso: proration.nextCycleStartIso,
           metadata: {
             type: "subscription",
             reservationId,
@@ -1750,6 +1752,8 @@ export default {
           successUrl: `${base}/subscribe/success?session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: `${base}/admin?canceled_admin=1&rid=${reservationId}`,
           billingCycleAnchor: proration.billingCycleAnchor,
+          remainingLessons: proration.remainingLessons,
+          nextCycleStartIso: proration.nextCycleStartIso,
           metadata: {
             type: "subscription",
             reservationId,

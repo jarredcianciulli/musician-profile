@@ -116,6 +116,25 @@ export async function createTrialCheckoutSession(env, {
   });
 }
 
+/** e.g. "November 1, 2026" in studio TZ — for Checkout product copy. */
+function formatBillingStartLabel(isoOrUnix) {
+  let d;
+  if (typeof isoOrUnix === "number" && Number.isFinite(isoOrUnix)) {
+    d = new Date(isoOrUnix * 1000);
+  } else if (typeof isoOrUnix === "string" && isoOrUnix) {
+    d = new Date(isoOrUnix);
+  } else {
+    return "";
+  }
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "America/New_York",
+  });
+}
+
 export async function createSubscriptionCheckoutSession(env, {
   email,
   name,
@@ -126,25 +145,48 @@ export async function createSubscriptionCheckoutSession(env, {
   successUrl,
   cancelUrl,
   billingCycleAnchor,
+  remainingLessons,
+  nextCycleStartIso,
   metadata = {},
 }) {
   const line_items = [];
+  const lessonCount =
+    typeof remainingLessons === "number" &&
+    Number.isFinite(remainingLessons) &&
+    remainingLessons > 0
+      ? Math.round(remainingLessons)
+      : null;
+  const nextBillLabel = formatBillingStartLabel(
+    nextCycleStartIso || billingCycleAnchor
+  );
+  const monthlyDollars = ((monthlyRateCents || 0) / 100).toFixed(
+    (monthlyRateCents || 0) % 100 === 0 ? 0 : 2
+  );
 
   if (prorateCents > 0) {
+    const lessonBit = lessonCount
+      ? `${lessonCount} remaining lesson${lessonCount === 1 ? "" : "s"} this month`
+      : "Remaining lessons this month";
     line_items.push({
       quantity: 1,
       price_data: {
         currency: "usd",
         unit_amount: prorateCents,
         product_data: {
-          name: `First-month proration (${durationMinutes} min lessons)`,
-          description: "Remaining lessons in the current month",
+          name: `Due today — ${lessonBit}`,
+          description: nextBillLabel
+            ? `Covers lessons until ${nextBillLabel}, when $${monthlyDollars}/mo billing begins on the 1st.`
+            : "Partial first month. Monthly tuition then bills on the 1st.",
         },
       },
     });
   }
 
-  if (priceId) {
+  // When the first monthly charge is delayed to the 1st, use inline price_data
+  // so Checkout can say “bills on the 1st” (Dashboard Price copy cannot).
+  // Stripe still may show “X days free” for that delay — custom_text clarifies.
+  const delayFirstInvoice = Boolean(billingCycleAnchor);
+  if (priceId && !delayFirstInvoice) {
     line_items.push({ quantity: 1, price: priceId });
   } else {
     line_items.push({
@@ -154,12 +196,21 @@ export async function createSubscriptionCheckoutSession(env, {
         unit_amount: monthlyRateCents,
         recurring: { interval: "month" },
         product_data: {
-          name: `Weekly ${durationMinutes}-min lessons`,
-          description: "Monthly subscription — Battery String Studio",
+          name: `Weekly ${durationMinutes}-min lessons — $${monthlyDollars}/mo`,
+          description: nextBillLabel
+            ? `First charge ${nextBillLabel}, then on the 1st each month. Not a free trial — today you only pay the partial month above.`
+            : "Billed on the 1st of each month. Not a free trial.",
         },
       },
     });
   }
+
+  const submitMessage =
+    prorateCents > 0 && nextBillLabel
+      ? `Today you pay only for remaining lessons this month. Stripe may show a short “free” period — that is the wait until ${nextBillLabel}, when $${monthlyDollars}/month tuition starts (billed on the 1st). Not a free trial.`
+      : prorateCents > 0
+        ? "Today you pay for remaining lessons this month. Monthly tuition then bills on the 1st — not a free trial."
+        : "Monthly subscription for your weekly lesson spot, billed on the 1st.";
 
   const body = {
     mode: "subscription",
@@ -180,21 +231,17 @@ export async function createSubscriptionCheckoutSession(env, {
         ...metadata,
       },
     },
-    // Stripe UI may say “Pay and start trial” when first monthly charge is delayed
-    // to the 1st — that delay is not a free trial; this is a real subscription.
     custom_text: {
       submit: {
-        message:
-          prorateCents > 0
-            ? "Today you pay for remaining lessons this month. Your monthly subscription then renews on the 1st."
-            : "Monthly subscription for your weekly lesson spot.",
+        message: submitMessage,
       },
     },
   };
 
   // Mid-month: charge one-time proration now; first recurring invoice on the 1st.
   // Stripe only allows this delay via trial_end when a one-time line item is
-  // present (billing_cycle_anchor + one-time is rejected). Not a free trial.
+  // present (billing_cycle_anchor + one-time is rejected). Not a free trial —
+  // Checkout may still label the wait as “X days free.”
   if (billingCycleAnchor) {
     body.subscription_data.trial_end = billingCycleAnchor;
   }
