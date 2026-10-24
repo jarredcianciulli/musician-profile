@@ -178,6 +178,7 @@ export async function sendStudentInviteEmail(
     ? `<p>Your weekly lesson spot is ready. Open your account to see your schedule and set up <strong>monthly auto-charge</strong> — your card stays on file securely with <strong>Stripe</strong> (we never see or store your full card number).</p>`
     : `<p>Your weekly lesson spot is ready. Open your account to see your schedule and <strong>pay what’s due</strong> for this period through Stripe Checkout.</p>`;
   const trustBlurb = `<p style="font-size:14px;color:#444;line-height:1.5">Payments are processed by <strong>Stripe</strong>, the same secure checkout used by millions of businesses. Your card details go only to Stripe — encrypted end to end — so you can pay with confidence.</p>`;
+  const accountSignInUrl = `${siteBase(env)}/account`;
   const result = await sendTransactionalEmail(env, {
     to: email,
     toName: name || email,
@@ -188,7 +189,9 @@ export async function sendStudentInviteEmail(
       ${trustBlurb}
       <p style="font-size:14px;color:#444;line-height:1.5">You’ll confirm the <a href="${siteBase(env)}/policy">studio policy</a> when you set up billing — it covers tuition, reserved weekly slots, and make-ups.</p>
       <p><a href="${escapeHtml(magicUrl)}" style="display:inline-block;padding:12px 18px;background:#1b3a5c;color:#fff;text-decoration:none">Open your account</a></p>
-      <p style="font-size:13px;color:#666">This link expires in 48 hours. If it expires or you need a new one, email <a href="mailto:${escapeHtml(inbox)}">${escapeHtml(inbox)}</a> and we&apos;ll resend it.</p>
+      <p style="font-size:13px;color:#666;margin-top:20px">This sign-in link expires in 48 hours. If it expires, request a new one here:</p>
+      <p><a href="${escapeHtml(accountSignInUrl)}" style="display:inline-block;padding:12px 18px;border:1px solid #1b3a5c;color:#1b3a5c;text-decoration:none">Request a new sign-in link</a></p>
+      <p style="font-size:13px;color:#666">Or email <a href="mailto:${escapeHtml(inbox)}">${escapeHtml(inbox)}</a> and we&apos;ll resend it.</p>
     `),
     replyTo: { email: inbox, name: "Battery String Studio" },
   });

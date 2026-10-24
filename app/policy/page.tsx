@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function PolicyPage() {
   return (
     <PublicShell>
-      <article className="section-container py-16 max-w-3xl">
+      <article className="section-container pt-10 pb-16 max-w-3xl">
         <p className="text-[11px] uppercase tracking-[0.18em] text-sky-deep font-semibold">
           Battery String Studio
         </p>

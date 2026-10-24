@@ -56,13 +56,17 @@ const Navbar: React.FC<Props> = ({ visible = true }) => {
     }
   };
 
+  // Home: fixed over the hero. Other pages: sticky in-flow so content
+  // doesn't collide with the bar where the body meets the nav.
+  const positionClass = onHome ? "fixed w-full top-0" : "sticky top-0 w-full";
+  const surfaceClass =
+    isOpen || isScrolled || !onHome
+      ? "bg-paper border-b border-line shadow-sm"
+      : "bg-transparent";
+
   return (
     <nav
-      className={`fixed w-full top-0 z-50 transition-[background-color,border-color,box-shadow,opacity] duration-300 ${
-        isOpen || isScrolled || !onHome
-          ? "bg-paper border-b border-line shadow-sm"
-          : "bg-transparent"
-      }`}
+      className={`${positionClass} z-50 transition-[background-color,border-color,box-shadow,opacity] duration-300 ${surfaceClass}`}
       style={{
         opacity: visible ? 1 : 0,
         pointerEvents: visible ? "auto" : "none",
