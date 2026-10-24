@@ -218,17 +218,6 @@ const Account: React.FC = () => {
     };
   }, [searchParams]);
 
-  const refresh = async () => {
-    try {
-      const next = await fetchAccountMe();
-      setData(next);
-      setError("");
-    } catch (err) {
-      setData(null);
-      setError(err instanceof Error ? err.message : "Session expired.");
-    }
-  };
-
   const onRequestLink = async (e: React.FormEvent) => {
     e.preventDefault();
     setRequesting(true);
