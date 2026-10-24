@@ -24,12 +24,23 @@ import {
   FlyerCampaign,
   HolidayWeek,
   LeadStatus,
+  LessonFormat,
   StudioEvent,
   StudioPayload,
   Weekday,
 } from "../types/studio";
 import { siteUrl } from "../lib/env";
-import { updateLeadStatus } from "../lib/bookingApi";
+import {
+  createAdminSubscriptionCheckout,
+  fetchSubscriptionSlots,
+  updateLeadStatus,
+  type AdminCheckoutResult,
+} from "../lib/bookingApi";
+import {
+  DEFAULT_SUBSCRIPTION_MINUTES,
+  SUBSCRIPTION_DURATIONS,
+  type SubscriptionDuration,
+} from "../lib/bookingPolicy";
 
 const DAY_LABELS: { day: Weekday; label: string }[] = [
   { day: 0, label: "Sunday" },
@@ -74,10 +85,62 @@ const Admin: React.FC = () => {
   const [flyerCode, setFlyerCode] = useState("");
   const [flyerLabel, setFlyerLabel] = useState("");
 
+  const [payName, setPayName] = useState("");
+  const [payEmail, setPayEmail] = useState("");
+  const [payDuration, setPayDuration] = useState<SubscriptionDuration>(
+    DEFAULT_SUBSCRIPTION_MINUTES
+  );
+  const [payFormat, setPayFormat] = useState<LessonFormat>("in_person");
+  const [payBilling, setPayBilling] = useState<"auto" | "manual">("auto");
+  const [paySlots, setPaySlots] = useState<
+    { start: string; end: string; label: string }[]
+  >([]);
+  const [paySlotStart, setPaySlotStart] = useState("");
+  const [payLoadingSlots, setPayLoadingSlots] = useState(false);
+  const [paySubmitting, setPaySubmitting] = useState(false);
+  const [payResult, setPayResult] = useState<AdminCheckoutResult | null>(null);
+  const [payError, setPayError] = useState("");
+
   useEffect(() => {
     if (!authed) return;
     loadStudio({ includePrivate: true }).then(setPayload);
   }, [authed]);
+
+  useEffect(() => {
+    if (!authed) return;
+    let cancelled = false;
+    setPayLoadingSlots(true);
+    setPayError("");
+    fetchSubscriptionSlots(payDuration)
+      .then((result) => {
+        if (cancelled) return;
+        const tz = result.availability?.timezone || "America/New_York";
+        const opts = (result.slots || []).map((s) => ({
+          start: s.start,
+          end: s.end,
+          label: `${formatSlotDay(s.start, tz)} · ${formatSlotTime(s.start, tz)}`,
+        }));
+        setPaySlots(opts);
+        setPaySlotStart((prev) =>
+          opts.some((o) => o.start === prev) ? prev : opts[0]?.start || ""
+        );
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setPaySlots([]);
+          setPaySlotStart("");
+          setPayError(
+            err instanceof Error ? err.message : "Could not load open slots."
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPayLoadingSlots(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authed, payDuration]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,6 +168,58 @@ const Admin: React.FC = () => {
         ? "Saved to API."
         : "Saved locally (browser). Deploy studio-api + set NEXT_PUBLIC_STUDIO_API for production."
     );
+  };
+
+  const createPayLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPayError("");
+    setPayResult(null);
+    const token = getAdminToken();
+    if (!token) {
+      setPayError("Re-login required.");
+      return;
+    }
+    const slot = paySlots.find((s) => s.start === paySlotStart);
+    if (!slot) {
+      setPayError("Pick an open weekly time.");
+      return;
+    }
+    if (!payName.trim() || !payEmail.trim()) {
+      setPayError("Name and email are required.");
+      return;
+    }
+    setPaySubmitting(true);
+    try {
+      const result = await createAdminSubscriptionCheckout(
+        {
+          name: payName.trim(),
+          email: payEmail.trim(),
+          durationMinutes: payDuration,
+          start: slot.start,
+          end: slot.end,
+          format: payFormat,
+          billingMode: payBilling,
+        },
+        token
+      );
+      setPayResult(result);
+      setStatus(result.summary);
+      const refreshed = await loadStudio({ includePrivate: true });
+      setPayload(refreshed);
+    } catch (err) {
+      setPayError(err instanceof Error ? err.message : "Could not create link.");
+    } finally {
+      setPaySubmitting(false);
+    }
+  };
+
+  const copyText = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setStatus("Copied to clipboard.");
+    } catch {
+      setStatus("Could not copy — select the URL manually.");
+    }
   };
 
   const setLeadStatus = async (id: string, status: LeadStatus) => {
@@ -529,6 +644,178 @@ const Admin: React.FC = () => {
           )}
         </section>
 
+        {/* Student payment link */}
+        <section>
+          <h2 className="font-display text-2xl mb-2">Student payment link</h2>
+          <p className="text-sm text-muted mb-6">
+            Create a Stripe Checkout URL to text or email. Auto-charge keeps a
+            card on file; manual gives a reusable monthly link for each 1st.
+          </p>
+          <form
+            onSubmit={createPayLink}
+            className="bg-white border border-line p-5 space-y-4 max-w-xl"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="text-sm block">
+                <span className="text-muted text-xs uppercase tracking-wider">
+                  Name
+                </span>
+                <input
+                  className="admin-input mt-1"
+                  value={payName}
+                  onChange={(e) => setPayName(e.target.value)}
+                  required
+                />
+              </label>
+              <label className="text-sm block">
+                <span className="text-muted text-xs uppercase tracking-wider">
+                  Email
+                </span>
+                <input
+                  type="email"
+                  className="admin-input mt-1"
+                  value={payEmail}
+                  onChange={(e) => setPayEmail(e.target.value)}
+                  required
+                />
+              </label>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <label className="text-sm block">
+                <span className="text-muted text-xs uppercase tracking-wider">
+                  Length
+                </span>
+                <select
+                  className="admin-input mt-1"
+                  value={payDuration}
+                  onChange={(e) =>
+                    setPayDuration(Number(e.target.value) as SubscriptionDuration)
+                  }
+                >
+                  {SUBSCRIPTION_DURATIONS.map((m) => (
+                    <option key={m} value={m}>
+                      {m} min
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm block">
+                <span className="text-muted text-xs uppercase tracking-wider">
+                  Format
+                </span>
+                <select
+                  className="admin-input mt-1"
+                  value={payFormat}
+                  onChange={(e) => setPayFormat(e.target.value as LessonFormat)}
+                >
+                  <option value="in_person">In person</option>
+                  <option value="online">Online</option>
+                </select>
+              </label>
+              <label className="text-sm block">
+                <span className="text-muted text-xs uppercase tracking-wider">
+                  Billing
+                </span>
+                <select
+                  className="admin-input mt-1"
+                  value={payBilling}
+                  onChange={(e) =>
+                    setPayBilling(e.target.value as "auto" | "manual")
+                  }
+                >
+                  <option value="auto">Auto-charge monthly</option>
+                  <option value="manual">Pay by link each month</option>
+                </select>
+              </label>
+            </div>
+            <label className="text-sm block">
+              <span className="text-muted text-xs uppercase tracking-wider">
+                First / weekly time
+              </span>
+              <select
+                className="admin-input mt-1"
+                value={paySlotStart}
+                onChange={(e) => setPaySlotStart(e.target.value)}
+                disabled={payLoadingSlots || paySlots.length === 0}
+                required
+              >
+                {payLoadingSlots ? (
+                  <option value="">Loading times…</option>
+                ) : paySlots.length === 0 ? (
+                  <option value="">No open slots</option>
+                ) : (
+                  paySlots.map((s) => (
+                    <option key={s.start} value={s.start}>
+                      {s.label}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
+            {payError ? (
+              <p className="text-sm text-accent" role="alert">
+                {payError}
+              </p>
+            ) : null}
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={paySubmitting || !paySlotStart}
+            >
+              {paySubmitting ? "Creating…" : "Create payment link"}
+            </button>
+            {payResult ? (
+              <div className="border border-line bg-paper-muted/40 px-4 py-3 space-y-3 text-sm">
+                <p className="text-ink-soft">{payResult.summary}</p>
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted mb-1">
+                    {payResult.billingMode === "manual"
+                      ? "Pay remaining lessons (send now)"
+                      : "Checkout (send now)"}
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      className="admin-input flex-1 text-xs"
+                      readOnly
+                      value={payResult.checkoutUrl}
+                    />
+                    <button
+                      type="button"
+                      className="btn-secondary shrink-0"
+                      onClick={() => copyText(payResult.checkoutUrl)}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+                {payResult.monthlyPaymentLinkUrl ? (
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted mb-1">
+                      Monthly tuition (reuse each 1st)
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        className="admin-input flex-1 text-xs"
+                        readOnly
+                        value={payResult.monthlyPaymentLinkUrl}
+                      />
+                      <button
+                        type="button"
+                        className="btn-secondary shrink-0"
+                        onClick={() =>
+                          copyText(payResult.monthlyPaymentLinkUrl || "")
+                        }
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </form>
+        </section>
+
         {/* Bookings */}
         <section>
           <h2 className="font-display text-2xl mb-2">Upcoming bookings</h2>
@@ -566,6 +853,16 @@ const Admin: React.FC = () => {
                     {b.notes ? (
                       <p className="text-sm text-ink-soft mt-1">{b.notes}</p>
                     ) : null}
+                    {b.emailsSentAt ? (
+                      <p className="text-xs text-muted mt-1">
+                        Confirmation emailed {new Date(b.emailsSentAt).toLocaleString()}
+                      </p>
+                    ) : null}
+                    {b.emailError ? (
+                      <p className="text-xs text-accent mt-1">
+                        Email error: {b.emailError}
+                      </p>
+                    ) : null}
                   </div>
                   <span className="text-xs uppercase tracking-wider text-sky-deep">
                       {b.status}
@@ -573,6 +870,80 @@ const Admin: React.FC = () => {
                   </span>
                 </li>
               ))}
+            </ul>
+          )}
+        </section>
+
+        {/* Subscriptions */}
+        <section>
+          <h2 className="font-display text-2xl mb-2">Subscriptions</h2>
+          <p className="text-sm text-muted mb-6">
+            Weekly spots after Stripe subscription checkout.
+          </p>
+          {(payload.subscriptions || []).length === 0 ? (
+            <p className="text-sm text-muted bg-white border border-line px-4 py-6">
+              No subscriptions yet.
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {[...(payload.subscriptions || [])]
+                .sort((a, b) =>
+                  (b.createdAt || "").localeCompare(a.createdAt || "")
+                )
+                .map((s) => (
+                  <li
+                    key={s.id}
+                    className="bg-white border border-line px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+                  >
+                    <div>
+                      <p className="font-medium">{s.name}</p>
+                      <p className="text-sm text-muted">
+                        {s.slotStart
+                          ? `${formatSlotDay(s.slotStart, tz)} · ${formatSlotTime(s.slotStart, tz)}`
+                          : "Slot TBD"}{" "}
+                        ({s.durationMinutes} min)
+                        {s.format === "online"
+                          ? " · online"
+                          : s.format === "in_person"
+                            ? " · in person"
+                            : ""}
+                      </p>
+                      <p className="text-sm text-muted">{s.email}</p>
+                      <p className="text-xs text-muted mt-1">
+                        Billing:{" "}
+                        {s.billingMode === "manual" ? "manual (link)" : "auto"}
+                      </p>
+                      {s.monthlyPaymentLinkUrl ? (
+                        <p className="text-xs mt-1">
+                          <button
+                            type="button"
+                            className="text-sky-deep hover:underline"
+                            onClick={() =>
+                              copyText(s.monthlyPaymentLinkUrl || "")
+                            }
+                          >
+                            Copy monthly pay link
+                          </button>
+                        </p>
+                      ) : null}
+                      {s.emailsSentAt ? (
+                        <p className="text-xs text-muted mt-1">
+                          Confirmation emailed{" "}
+                          {new Date(s.emailsSentAt).toLocaleString()}
+                        </p>
+                      ) : null}
+                      {s.emailError ? (
+                        <p className="text-xs text-accent mt-1">
+                          Email error: {s.emailError}
+                        </p>
+                      ) : null}
+                    </div>
+                    <span className="text-xs uppercase tracking-wider text-sky-deep">
+                      {s.status}
+                      {s.billingMode === "manual" ? " · manual" : ""}
+                    </span>
+                  </li>
+                ))}
             </ul>
           )}
         </section>

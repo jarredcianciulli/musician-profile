@@ -77,12 +77,15 @@ export type LessonBooking = {
   stripePaymentIntent?: string;
   amountCents?: number;
   paidAt?: string;
+  emailsSentAt?: string;
+  emailError?: string;
 };
 
 export type StudioSubscription = {
   id: string;
   stripeSubscriptionId: string;
   stripeCustomerId: string;
+  stripeSessionId?: string;
   email: string;
   name: string;
   durationMinutes: number;
@@ -93,6 +96,13 @@ export type StudioSubscription = {
   weekday?: number;
   format?: LessonFormat;
   policyAcceptedAt?: string;
+  reservationId?: string;
+  emailsSentAt?: string;
+  emailError?: string;
+  /** auto = Stripe subscription; manual = pay-by-link each month */
+  billingMode?: "auto" | "manual" | string;
+  monthlyPaymentLinkUrl?: string;
+  paidAt?: string;
 };
 
 export type FlyerCampaign = {

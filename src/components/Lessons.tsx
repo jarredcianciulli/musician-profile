@@ -198,6 +198,7 @@ const Lessons: React.FC = () => {
         isOpen={subOpen}
         onClose={() => setSubOpen(false)}
         mobile={subMobile}
+        initialDuration={duration}
       />
     </section>
   );

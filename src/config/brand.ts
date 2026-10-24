@@ -25,6 +25,7 @@ export const palette = {
   paperMuted: "#E8EEF4",
   sky: "#9DB7D4",
   skyDeep: "#7A9BBF",
+  skyInk: "#1B3A5C",
   gold: "#9DB7D4",
   goldDeep: "#7A9BBF",
   accent: "#0A0A0A",

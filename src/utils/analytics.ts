@@ -58,9 +58,6 @@ export const analytics = {
   contactFormSubmitted: () => {
     trackEvent("contact_form_submit", "Contact", "Main Contact Form");
   },
-  expressInterestClicked: () => {
-    trackEvent("express_interest_clicked", "Contact", "Group Classes Interest");
-  },
 
   learnMoreClicked: (location: string) => {
     trackEvent("learn_more_clicked", "Navigation", location);

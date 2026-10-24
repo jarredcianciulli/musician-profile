@@ -6,10 +6,12 @@ import {
 import {
   createTrialCheckoutSession,
   createSubscriptionCheckoutSession,
+  createProrationPaymentSession,
+  createMonthlyPaymentLink,
   retrieveCheckoutSession,
   verifyStripeWebhook,
 } from "./stripe.js";
-import { computeProration } from "./proration.js";
+import { computeProration, weekdayFromDate } from "./proration.js";
 import {
   leadFromReservation,
   upsertLead,
@@ -413,7 +415,26 @@ async function markTrialEmailsSent(env, payload, bookingId) {
 async function markSubEmailsSent(env, payload, subId) {
   const subscriptions = (payload.subscriptions || []).map((s) =>
     s.id === subId || s.stripeSubscriptionId === subId
-      ? { ...s, emailsSentAt: new Date().toISOString() }
+      ? {
+          ...s,
+          emailsSentAt: new Date().toISOString(),
+          emailError: undefined,
+        }
+      : s
+  );
+  const next = {
+    ...payload,
+    subscriptions,
+    updatedAt: new Date().toISOString(),
+  };
+  await writePayload(env, next);
+  return next;
+}
+
+async function markSubEmailError(env, payload, subId, msg) {
+  const subscriptions = (payload.subscriptions || []).map((s) =>
+    s.id === subId || s.stripeSubscriptionId === subId
+      ? { ...s, emailError: String(msg).slice(0, 500) }
       : s
   );
   const next = {
@@ -502,22 +523,37 @@ async function confirmSubscriptionFromSession(env, payload, session) {
       : session.customer?.id;
 
   const existing = (payload.subscriptions || []).find(
-    (s) => s.stripeSubscriptionId && s.stripeSubscriptionId === subId
+    (s) =>
+      (s.stripeSubscriptionId && s.stripeSubscriptionId === subId) ||
+      (session.id && s.stripeSessionId === session.id)
   );
   if (existing) {
-    if (!existing.emailsSentAt) {
-      try {
-        const reservation = (payload.reservations || []).find(
-          (r) => r.id === existing.reservationId
-        );
-        await sendSubscriptionBookedEmails(env, existing, reservation);
-        const next = await markSubEmailsSent(env, payload, existing.id);
-        return { payload: next, subscription: existing };
-      } catch (err) {
-        console.error("Subscription confirmation emails failed:", err);
-      }
+    if (existing.emailsSentAt) {
+      return { payload, subscription: existing };
     }
-    return { payload, subscription: existing };
+    try {
+      const reservation = (payload.reservations || []).find(
+        (r) => r.id === existing.reservationId
+      );
+      await sendSubscriptionBookedEmails(env, existing, reservation);
+      const next = await markSubEmailsSent(env, payload, existing.id);
+      return {
+        payload: next,
+        subscription: {
+          ...existing,
+          emailsSentAt: new Date().toISOString(),
+          emailError: undefined,
+        },
+      };
+    } catch (err) {
+      console.error("Subscription confirmation emails failed:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      const next = await markSubEmailError(env, payload, existing.id, msg);
+      return {
+        payload: next,
+        subscription: { ...existing, emailError: msg.slice(0, 500) },
+      };
+    }
   }
 
   const reservationId = meta.reservationId || "";
@@ -535,14 +571,16 @@ async function confirmSubscriptionFromSession(env, payload, session) {
     id: newId("sub"),
     stripeSubscriptionId: subId || "",
     stripeCustomerId: customerId || "",
+    stripeSessionId: session.id || "",
     email: (session.customer_email || reservation?.email || "").toLowerCase(),
     name: meta.name || reservation?.name || "",
     durationMinutes: Number(meta.durationMinutes || reservation?.durationMinutes || 45),
     status: "active",
+    billingMode: meta.billingMode || reservation?.billingMode || "auto",
     createdAt: new Date().toISOString(),
     slotStart: meta.slotStart || reservation?.start || "",
     slotEnd: meta.slotEnd || reservation?.end || "",
-    weekday: Number(meta.weekday || reservation?.weekday || 0) || undefined,
+    weekday: Number(meta.weekday ?? reservation?.weekday),
     format: meta.format || reservation?.format || "in_person",
     policyAcceptedAt: meta.policyAcceptedAt || "",
     reservationId: reservationId || undefined,
@@ -558,11 +596,104 @@ async function confirmSubscriptionFromSession(env, payload, session) {
   try {
     await sendSubscriptionBookedEmails(env, record, reservation);
     next = await markSubEmailsSent(env, next, record.id);
+    return {
+      payload: next,
+      subscription: {
+        ...record,
+        emailsSentAt: new Date().toISOString(),
+        emailError: undefined,
+      },
+    };
   } catch (err) {
     console.error("Subscription confirmation emails failed:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    next = await markSubEmailError(env, next, record.id, msg);
+    return {
+      payload: next,
+      subscription: { ...record, emailError: msg.slice(0, 500) },
+    };
+  }
+}
+
+/** Activate manual enrollment after one-time proration Checkout. */
+async function confirmManualProrationFromSession(env, payload, session) {
+  const meta = session?.metadata || {};
+  if (meta.type !== "manual_proration") {
+    return { payload, subscription: null };
+  }
+  const reservationId = meta.reservationId || "";
+  const existing = (payload.subscriptions || []).find(
+    (s) =>
+      (session.id && s.stripeSessionId === session.id) ||
+      (reservationId && s.reservationId === reservationId)
+  );
+  if (existing) {
+    return { payload, subscription: existing };
   }
 
-  return { payload: next, subscription: record };
+  const reservation = (payload.reservations || []).find(
+    (r) => r.id === reservationId
+  );
+  const reservations = (payload.reservations || []).map((r) => {
+    if (reservationId && r.id === reservationId) {
+      return { ...r, status: "active", stripeSessionId: session.id };
+    }
+    return r;
+  });
+
+  const record = {
+    id: newId("sub"),
+    stripeSubscriptionId: "",
+    stripeCustomerId:
+      typeof session.customer === "string"
+        ? session.customer
+        : session.customer?.id || "",
+    stripeSessionId: session.id || "",
+    email: (session.customer_email || reservation?.email || "").toLowerCase(),
+    name: meta.name || reservation?.name || "",
+    durationMinutes: Number(
+      meta.durationMinutes || reservation?.durationMinutes || 45
+    ),
+    status: "active",
+    billingMode: "manual",
+    monthlyPaymentLinkUrl: meta.monthlyPaymentLinkUrl || "",
+    createdAt: new Date().toISOString(),
+    slotStart: meta.slotStart || reservation?.start || "",
+    slotEnd: meta.slotEnd || reservation?.end || "",
+    weekday: Number(meta.weekday || reservation?.weekday || 0),
+    format: meta.format || reservation?.format || "in_person",
+    policyAcceptedAt: meta.policyAcceptedAt || reservation?.policyAcceptedAt || "",
+    reservationId: reservationId || undefined,
+    paidAt: new Date().toISOString(),
+  };
+
+  let next = {
+    ...payload,
+    reservations,
+    subscriptions: [...(payload.subscriptions || []), record],
+    updatedAt: new Date().toISOString(),
+  };
+  await writePayload(env, next);
+
+  try {
+    await sendSubscriptionBookedEmails(env, record, reservation);
+    next = await markSubEmailsSent(env, next, record.id);
+    return {
+      payload: next,
+      subscription: {
+        ...record,
+        emailsSentAt: new Date().toISOString(),
+      },
+    };
+  } catch (err) {
+    console.error("Manual enrollment emails failed:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    next = await markSubEmailError(env, next, record.id, msg);
+    return {
+      payload: next,
+      subscription: { ...record, emailError: msg.slice(0, 500) },
+    };
+  }
 }
 
 function siteBase(env) {
@@ -651,6 +782,15 @@ export default {
           );
           payload = result.payload;
         }
+
+        if (meta.type === "manual_proration") {
+          const result = await confirmManualProrationFromSession(
+            env,
+            payload,
+            session
+          );
+          payload = result.payload;
+        }
       }
 
       if (event.type === "checkout.session.expired") {
@@ -658,7 +798,11 @@ export default {
         const meta = session?.metadata || {};
         let payload = await readPayload(env);
 
-        if (meta.type === "subscription" || meta.reservationId) {
+        if (
+          meta.type === "subscription" ||
+          meta.type === "manual_proration" ||
+          meta.reservationId
+        ) {
           const { payload: next } = cancelHeldReservation(payload, {
             reservationId: meta.reservationId,
             sessionId: session?.id,
@@ -944,7 +1088,7 @@ export default {
 
       // Webhook may lag (or be missing in the wrong Stripe mode).
       // Confirm from Stripe when the visitor lands on the success URL.
-      if (!booking || booking.status !== "scheduled") {
+      if (!booking || booking.status !== "scheduled" || !booking.emailsSentAt) {
         try {
           const session = await retrieveCheckoutSession(env, sessionId);
           const paid =
@@ -981,6 +1125,63 @@ export default {
         200,
         origin
       );
+    }
+
+    // Confirm subscription after Checkout return (parity with trial session confirm)
+    if (request.method === "GET" && route === "/studio/subscription/session") {
+      const sessionId = url.searchParams.get("session_id") || "";
+      if (!sessionId) {
+        return json({ error: "session_id required" }, 400, origin);
+      }
+      let payload = await readPayload(env);
+      let subscription = (payload.subscriptions || []).find(
+        (s) => s.stripeSessionId === sessionId
+      );
+      if (!subscription) {
+        const reservation = (payload.reservations || []).find(
+          (r) => r.stripeSessionId === sessionId
+        );
+        if (reservation) {
+          subscription = (payload.subscriptions || []).find(
+            (s) => s.reservationId === reservation.id
+          );
+        }
+      }
+
+      // Webhook may lag or miss — confirm + send emails when visitor lands here.
+      if (!subscription || !subscription.emailsSentAt) {
+        try {
+          const session = await retrieveCheckoutSession(env, sessionId);
+          const complete =
+            session.status === "complete" ||
+            session.payment_status === "paid" ||
+            session.payment_status === "no_payment_required";
+          if (complete && session.metadata?.type === "subscription") {
+            const result = await confirmSubscriptionFromSession(
+              env,
+              payload,
+              session
+            );
+            payload = result.payload;
+            subscription = result.subscription;
+          } else if (complete && session.metadata?.type === "manual_proration") {
+            const result = await confirmManualProrationFromSession(
+              env,
+              payload,
+              session
+            );
+            payload = result.payload;
+            subscription = result.subscription;
+          }
+        } catch (err) {
+          console.error("Subscription session confirm failed:", err);
+        }
+      }
+
+      if (!subscription) {
+        return json({ error: "Subscription not found" }, 404, origin);
+      }
+      return json({ subscription }, 200, origin);
     }
 
     // Legacy direct book (no payment) — disabled when Stripe configured
@@ -1094,16 +1295,11 @@ export default {
       }
 
       const startDate = new Date(start);
-      const weekdayParts = new Intl.DateTimeFormat("en-US", {
-        timeZone: payload.availability.timezone || "America/New_York",
-        weekday: "short",
-      }).formatToParts(startDate);
-      const wdLabel = weekdayParts.find((p) => p.type === "weekday")?.value;
-      const preferredWeekday =
-        wdLabel === "Mon" ? 1 : wdLabel === "Sat" ? 6 : null;
-      if (!preferredWeekday) {
+      const tz = payload.availability.timezone || "America/New_York";
+      const preferredWeekday = weekdayFromDate(startDate, tz);
+      if (preferredWeekday == null) {
         return json(
-          { error: "Weekly lessons must start on Monday or Saturday." },
+          { error: "Could not determine weekly lesson day from that time." },
           400,
           origin
         );
@@ -1115,6 +1311,7 @@ export default {
           durationMinutes: mins,
           preferredWeekday,
           startDate,
+          weeklyHours: payload.availability?.weeklyHours,
         });
       } catch (error) {
         return json({ error: error.message }, 400, origin);
@@ -1217,20 +1414,256 @@ export default {
 
     if (request.method === "GET" && route === "/studio/subscription/proration") {
       const mins = Number(url.searchParams.get("durationMinutes") || 45);
-      const preferredWeekday = Number(url.searchParams.get("weekday") || 0);
+      const preferredWeekday = Number(url.searchParams.get("weekday"));
       try {
+        const payload = await readPayload(env);
         const proration = computeProration({
           durationMinutes: mins,
-          preferredWeekday: preferredWeekday === 1 || preferredWeekday === 6
-            ? preferredWeekday
-            : undefined,
+          preferredWeekday,
           startDate: url.searchParams.get("startDate")
             ? new Date(url.searchParams.get("startDate"))
             : new Date(),
+          weeklyHours: payload.availability?.weeklyHours,
         });
         return json({ proration }, 200, origin);
       } catch (error) {
         return json({ error: error.message }, 400, origin);
+      }
+    }
+
+    // Admin: create Checkout URL for a student (auto subscription or manual pay-by-link)
+    if (
+      request.method === "POST" &&
+      route === "/studio/subscription/admin-checkout"
+    ) {
+      const token = getBearer(request);
+      if (!env.ADMIN_TOKEN || token !== env.ADMIN_TOKEN) {
+        return json({ error: "Unauthorized" }, 401, origin);
+      }
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return json({ error: "Invalid JSON" }, 400, origin);
+      }
+      const name = String(body?.name || "").trim();
+      const email = String(body?.email || "").trim().toLowerCase();
+      const mins = Number(body?.durationMinutes);
+      const start = String(body?.start || "").trim();
+      const end = String(body?.end || "").trim();
+      const format = body?.format || "in_person";
+      const billingMode =
+        body?.billingMode === "manual" ? "manual" : "auto";
+      if (!name || !email || !start || !end) {
+        return json(
+          { error: "name, email, start, and end are required." },
+          400,
+          origin
+        );
+      }
+      if (![30, 45, 60].includes(mins)) {
+        return json({ error: "durationMinutes must be 30, 45, or 60." }, 400, origin);
+      }
+      if (format && !PUBLIC_FORMATS.has(format)) {
+        return json({ error: "Invalid lesson format." }, 400, origin);
+      }
+      if (!env.STRIPE_SECRET_KEY) {
+        return json({ error: "Stripe is not configured." }, 503, origin);
+      }
+
+      const payload = await readPayload(env);
+      try {
+        await assertSlotOpen(env, payload, start, end, mins);
+      } catch (error) {
+        return json({ error: error.message }, 409, origin);
+      }
+
+      const startDate = new Date(start);
+      const tz = payload.availability.timezone || "America/New_York";
+      const preferredWeekday = weekdayFromDate(startDate, tz);
+      if (preferredWeekday == null) {
+        return json(
+          { error: "Could not determine weekly lesson day from that time." },
+          400,
+          origin
+        );
+      }
+
+      let proration;
+      try {
+        proration = computeProration({
+          durationMinutes: mins,
+          preferredWeekday,
+          startDate,
+          weeklyHours: payload.availability?.weeklyHours,
+        });
+      } catch (error) {
+        return json({ error: error.message }, 400, origin);
+      }
+
+      const reservationId = newId("res");
+      const expiresAt = new Date(Date.now() + HOLD_TTL_MS).toISOString();
+      const policyAcceptedAt = new Date().toISOString();
+      const reservation = {
+        id: reservationId,
+        start,
+        end,
+        name,
+        email,
+        notes: "admin_checkout",
+        format,
+        durationMinutes: mins,
+        weekday: preferredWeekday,
+        status: "held",
+        billingMode,
+        createdAt: policyAcceptedAt,
+        expiresAt,
+        policyAcceptedAt,
+      };
+
+      await writePayload(env, {
+        ...payload,
+        reservations: [...(payload.reservations || []), reservation],
+        leads: upsertLead(payload.leads, {
+          source: "subscribe_abandon",
+          status: "new",
+          name,
+          email,
+          slotStart: start,
+          slotEnd: end,
+          durationMinutes: mins,
+          format,
+          reservationId,
+          notes: `admin_checkout_${billingMode}`,
+        }),
+        updatedAt: new Date().toISOString(),
+      });
+
+      const priceEnvKey = `STRIPE_PRICE_${mins}`;
+      const priceId = env[priceEnvKey] || "";
+      const base = siteBase(env);
+
+      try {
+        if (billingMode === "manual") {
+          const monthlyLink = await createMonthlyPaymentLink(env, {
+            durationMinutes: mins,
+            monthlyRateCents: proration.monthlyRateCents,
+            priceId: priceId || undefined,
+          });
+          const session = await createProrationPaymentSession(env, {
+            email,
+            name,
+            durationMinutes: mins,
+            prorateCents: proration.prorateCents || proration.perLessonCents,
+            successUrl: `${base}/subscribe/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancelUrl: `${base}/admin?canceled_admin=1&rid=${reservationId}`,
+            metadata: {
+              reservationId,
+              slotStart: start,
+              slotEnd: end,
+              weekday: String(preferredWeekday),
+              format,
+              policyAcceptedAt,
+              billingMode: "manual",
+              monthlyPaymentLinkUrl: monthlyLink.url,
+              remainingLessons: String(proration.remainingLessons),
+              perLessonCents: String(proration.perLessonCents),
+            },
+          });
+
+          const fresh = await readPayload(env);
+          await writePayload(env, {
+            ...fresh,
+            reservations: (fresh.reservations || []).map((r) =>
+              r.id === reservationId
+                ? {
+                    ...r,
+                    stripeSessionId: session.id,
+                    monthlyPaymentLinkUrl: monthlyLink.url,
+                  }
+                : r
+            ),
+            updatedAt: new Date().toISOString(),
+          });
+
+          return json(
+            {
+              billingMode: "manual",
+              checkoutUrl: session.url,
+              monthlyPaymentLinkUrl: monthlyLink.url,
+              sessionId: session.id,
+              reservationId,
+              proration,
+              summary: `Student pays $${(proration.prorateCents / 100).toFixed(
+                proration.prorateCents % 100 === 0 ? 0 : 2
+              )} now for remaining lessons; then use the monthly link ($${
+                proration.monthlyRate
+              }/mo) each 1st.`,
+            },
+            200,
+            origin
+          );
+        }
+
+        const session = await createSubscriptionCheckoutSession(env, {
+          email,
+          name,
+          durationMinutes: mins,
+          monthlyRateCents: proration.monthlyRateCents,
+          prorateCents: proration.prorateCents,
+          priceId: priceId || undefined,
+          successUrl: `${base}/subscribe/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${base}/admin?canceled_admin=1&rid=${reservationId}`,
+          billingCycleAnchor: proration.billingCycleAnchor,
+          metadata: {
+            type: "subscription",
+            reservationId,
+            slotStart: start,
+            slotEnd: end,
+            weekday: String(preferredWeekday),
+            format,
+            policyAcceptedAt,
+            billingMode: "auto",
+            remainingLessons: String(proration.remainingLessons),
+            perLessonCents: String(proration.perLessonCents),
+          },
+        });
+
+        const fresh = await readPayload(env);
+        await writePayload(env, {
+          ...fresh,
+          reservations: (fresh.reservations || []).map((r) =>
+            r.id === reservationId
+              ? { ...r, stripeSessionId: session.id }
+              : r
+          ),
+          updatedAt: new Date().toISOString(),
+        });
+
+        return json(
+          {
+            billingMode: "auto",
+            checkoutUrl: session.url,
+            sessionId: session.id,
+            reservationId,
+            proration,
+            summary: `Student pays $${(proration.prorateCents / 100).toFixed(
+              proration.prorateCents % 100 === 0 ? 0 : 2
+            )} today; $${proration.monthlyRate}/mo auto from ${new Date(
+              proration.nextCycleStartIso
+            ).toLocaleDateString("en-US")}.`,
+          },
+          200,
+          origin
+        );
+      } catch (error) {
+        return json(
+          {
+            error: error.message || "Could not create payment link.",
+          },
+          502,
+          origin
+        );
       }
     }
 

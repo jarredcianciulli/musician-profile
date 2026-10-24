@@ -18,7 +18,10 @@ import {
   SUBSCRIPTION_MONTHLY_RATES,
   SubscriptionDuration,
 } from "@/lib/bookingPolicy";
-import { computeProration } from "@/lib/subscriptionProration";
+import {
+  computeProration,
+  weekdayFromDate,
+} from "@/lib/subscriptionProration";
 import {
   STUDIO_POLICY_SECTIONS,
   STUDIO_POLICY_TITLE,
@@ -37,6 +40,8 @@ type Props = {
   onClose: () => void;
   /** Captured when opening — do not flip mid-session. */
   mobile: boolean;
+  /** Duration selected on Lessons pricing card. */
+  initialDuration?: SubscriptionDuration;
 };
 
 function money(n: number): string {
@@ -47,11 +52,12 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
   isOpen,
   onClose,
   mobile,
+  initialDuration = DEFAULT_SUBSCRIPTION_MINUTES,
 }) => {
   const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState<Step>(1);
   const [duration, setDuration] = useState<SubscriptionDuration>(
-    DEFAULT_SUBSCRIPTION_MINUTES
+    initialDuration
   );
   const [format, setFormat] = useState<LessonFormat>("in_person");
   const [slots, setSlots] = useState<TimeSlot[]>([]);
@@ -72,7 +78,7 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
   useEffect(() => {
     if (!isOpen) return;
     setStep(1);
-    setDuration(DEFAULT_SUBSCRIPTION_MINUTES);
+    setDuration(initialDuration);
     setFormat("in_person");
     setSelectedDay("");
     setSelectedSlot(null);
@@ -82,7 +88,13 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
     setSubmitting(false);
     setError("");
     setSlots([]);
-  }, [isOpen]);
+    analytics.subscribeOpened();
+  }, [isOpen, initialDuration]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    analytics.subscribeStep(step);
+  }, [isOpen, step]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -152,30 +164,28 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
     [slots, selectedDay, timezone]
   );
 
-  const preferredWeekday: 1 | 6 | null = useMemo(() => {
+  const preferredWeekday = useMemo(() => {
     if (!selectedSlot) return null;
-    const label = new Intl.DateTimeFormat("en-US", {
-      timeZone: timezone,
-      weekday: "short",
-    }).format(new Date(selectedSlot.start));
-    if (label === "Mon") return 1;
-    if (label === "Sat") return 6;
-    return null;
+    return weekdayFromDate(selectedSlot.start, timezone);
   }, [selectedSlot, timezone]);
 
   const proration = useMemo(() => {
-    if (!selectedSlot || !preferredWeekday) return null;
-    return computeProration({
-      durationMinutes: duration,
-      preferredWeekday,
-      startDate: new Date(selectedSlot.start),
-    });
+    if (!selectedSlot || preferredWeekday == null) return null;
+    try {
+      return computeProration({
+        durationMinutes: duration,
+        preferredWeekday,
+        startDate: new Date(selectedSlot.start),
+      });
+    } catch {
+      return null;
+    }
   }, [selectedSlot, preferredWeekday, duration]);
 
   const monthlyPrice = SUBSCRIPTION_MONTHLY_RATES[duration];
 
   const pay = async () => {
-    if (!selectedSlot || !policyAccepted || !preferredWeekday) {
+    if (!selectedSlot || !policyAccepted || preferredWeekday == null || !proration) {
       setError("Complete each step and agree to the studio policy.");
       return;
     }
@@ -233,7 +243,7 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
             variant="horizontal"
             tone="light"
             className="max-w-[180px]"
-            markClassName="w-5 h-9 text-sky-deep shrink-0"
+            markClassName="w-5 h-9 text-sky-ink shrink-0"
           />
         </Link>
         <button
@@ -330,8 +340,7 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
               ) : (
                 <>
                   <p className="text-sm text-ink-soft">
-                    Pick the day and time you want reserved every week (Mon or
-                    Sat).
+                    Pick the day and time you want reserved every week.
                   </p>
                   <BookingDayPicker
                     selectedDay={selectedDay}
@@ -366,63 +375,72 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
             </div>
           )}
 
-          {step === 3 && selectedSlot && proration && (
+          {step === 3 && selectedSlot && (
             <div className="space-y-4 text-sm">
-              <div className="border border-line bg-paper-muted/50 px-4 py-4 space-y-2">
-                <p className="font-medium text-ink text-base">
-                  You&apos;re reserving{" "}
-                  {formatSlotDay(selectedSlot.start, timezone)} at{" "}
-                  {formatSlotTime(selectedSlot.start, timezone)} each week
+              {!proration ? (
+                <p className="text-accent" role="alert">
+                  Could not calculate the first-month total for that day. Go
+                  back and pick another weekly time, or contact the studio.
                 </p>
-                <p className="text-ink-soft">
-                  {duration} min ·{" "}
-                  {format === "online" ? "Online" : "In person"}
-                </p>
-                <p className="text-ink-soft">
-                  Partial first month: {proration.remainingLessons} lesson
-                  {proration.remainingLessons === 1 ? "" : "s"} × $
-                  {money(proration.perLessonDollars)} ={" "}
-                  <strong>${money(proration.prorateDollars)}</strong>
-                </p>
-                <p className="text-ink-soft">
-                  Then ${monthlyPrice}/mo starting{" "}
-                  {new Date(proration.nextCycleStartIso).toLocaleDateString(
-                    "en-US",
-                    {
-                      month: "long",
-                      day: "numeric",
-                      year: "numeric",
-                      timeZone: timezone,
-                    }
-                  )}
-                  .
-                </p>
-              </div>
-              <label className="block">
-                <span className="text-[11px] uppercase tracking-wider text-muted font-semibold">
-                  Name
-                </span>
-                <input
-                  className="mt-1 w-full border border-line px-3 py-3 text-base text-ink focus:outline-none focus:border-sky-deep"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  autoComplete="name"
-                  required
-                />
-              </label>
-              <label className="block">
-                <span className="text-[11px] uppercase tracking-wider text-muted font-semibold">
-                  Email
-                </span>
-                <input
-                  type="email"
-                  className="mt-1 w-full border border-line px-3 py-3 text-base text-ink focus:outline-none focus:border-sky-deep"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                  required
-                />
-              </label>
+              ) : (
+                <>
+                  <div className="border border-line bg-paper-muted/50 px-4 py-4 space-y-2">
+                    <p className="font-medium text-ink text-base">
+                      You&apos;re reserving{" "}
+                      {formatSlotDay(selectedSlot.start, timezone)} at{" "}
+                      {formatSlotTime(selectedSlot.start, timezone)} each week
+                    </p>
+                    <p className="text-ink-soft">
+                      {duration} min ·{" "}
+                      {format === "online" ? "Online" : "In person"}
+                    </p>
+                    <p className="text-ink-soft">
+                      Partial first month: {proration.remainingLessons} lesson
+                      {proration.remainingLessons === 1 ? "" : "s"} × $
+                      {money(proration.perLessonDollars)} ={" "}
+                      <strong>${money(proration.prorateDollars)}</strong>
+                    </p>
+                    <p className="text-ink-soft">
+                      Then ${monthlyPrice}/mo starting{" "}
+                      {new Date(proration.nextCycleStartIso).toLocaleDateString(
+                        "en-US",
+                        {
+                          month: "long",
+                          day: "numeric",
+                          year: "numeric",
+                          timeZone: timezone,
+                        }
+                      )}
+                      .
+                    </p>
+                  </div>
+                  <label className="block">
+                    <span className="text-[11px] uppercase tracking-wider text-muted font-semibold">
+                      Name
+                    </span>
+                    <input
+                      className="mt-1 w-full border border-line px-3 py-3 text-base text-ink focus:outline-none focus:border-sky-deep"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      autoComplete="name"
+                      required
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] uppercase tracking-wider text-muted font-semibold">
+                      Email
+                    </span>
+                    <input
+                      type="email"
+                      className="mt-1 w-full border border-line px-3 py-3 text-base text-ink focus:outline-none focus:border-sky-deep"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      autoComplete="email"
+                      required
+                    />
+                  </label>
+                </>
+              )}
             </div>
           )}
 
@@ -506,6 +524,12 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
             }
             onClick={() => {
               setError("");
+              if (step === 2 && selectedSlot && !proration) {
+                setError(
+                  "Could not price that weekly day. Pick another time or contact the studio."
+                );
+                return;
+              }
               setStep((s) => (s + 1) as Step);
             }}
           >

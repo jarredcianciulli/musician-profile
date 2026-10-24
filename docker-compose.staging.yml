@@ -14,5 +14,5 @@ services:
         NEXT_PUBLIC_STUDIO_EMAIL: ${NEXT_PUBLIC_STUDIO_EMAIL:-jarred@batterystringstudio.com}
     container_name: bss_studio_staging
     ports:
-      - "8088:3000"
+      - "172.17.0.1:8088:3000"
     restart: unless-stopped

@@ -63,12 +63,19 @@ Ad / lead URLs: `https://batterystringstudio.com/lead?f={code}&utm_source=…`
 
 ### Stripe Checkout logo
 
+Checkout shows the brand mark **small** (~32–48px). Use the Stripe-optimized assets (mark fills the square — the full wordmark lockup becomes unreadable at that size):
+
+| Slot | File | Notes |
+|------|------|--------|
+| **Icon** (required) | `public/brand/bss-stripe-icon.png` (512×512) or `bss-stripe-icon-250.png` | Square, transparent, mark only |
+| **Logo** (optional) | `public/brand/bss-stripe-logo.png` | Wide lockup for the Checkout header |
+
 **Upload in the Stripe Dashboard** (not required in checkout API code for day-to-day branding):
 
 1. [Settings → Branding](https://dashboard.stripe.com/settings/branding) (and **Checkout branding** if shown)
 2. Do this in **Test mode** and **Live mode** separately
-3. Upload a square **icon** (≥128×128, PNG/JPG, &lt;512KB) — use `public/brand/bss-nav-lockup-250.png` or the bow-string mark
-4. Optional wider **logo** for the Checkout header
+3. Upload the **icon** (≥128×128, PNG/JPG, &lt;512KB)
+4. Optionally upload the wider **logo** for the Checkout header
 
 That branding applies to hosted Checkout, receipts, etc. You *can* override per session via `branding_settings` in the API, but Dashboard upload is enough.
 
@@ -123,13 +130,17 @@ npx wrangler deploy --env staging
 
 If the webhook URL was set to `booking-api-staging.batterystringstudio.com` and that host does not resolve, Stripe never delivers events — update the endpoint to workers.dev above.
 
-Confirm Brevo sender `jarred@batterystringstudio.com` is verified. Failed sends store `emailError` on the booking in `/admin` (and do **not** set `emailsSentAt`, so a later confirm can retry).
+Confirm Brevo sender `jarred@batterystringstudio.com` is verified. Failed sends store `emailError` on the booking/subscription in `/admin` (and do **not** set `emailsSentAt`, so a later confirm can retry).
 
-Smoke on staging: `/trial` → pay with `4242…` → emails + `/admin` booking. Cancel mid-checkout → hold frees.
+Staging Worker secrets currently expected: `BREVO_API_KEY`, `STRIPE_SECRET_KEY` (`sk_test_…`), `STRIPE_WEBHOOK_SECRET`, `ADMIN_TOKEN`.
+
+Smoke on staging: `/trial` → pay with `4242…` → emails + `/admin` booking. Subscribe → `/subscribe/success` also confirms + emails if the webhook lagged. Cancel mid-checkout → hold frees.
+
+Admin **Student payment link**: `/admin` → name/email/duration/slot + Auto or Manual → copy Checkout URL (and monthly Payment Link if Manual). Friday weekly days are supported.
 
 Vars already in `wrangler.toml`: `FROM_EMAIL` / `TO_EMAIL` / `FROM_NAME`.
 
-**Emails sent on:** trial paid, subscription paid, `/lead` form (studio alert + client auto-reply). Soft-fail if Brevo is unset.
+**Emails sent on:** trial paid, subscription paid, `/lead` form (studio alert + client auto-reply). Soft-fail if Brevo is unset (HTTP still 200; `emailError` recorded).
 
 ## Launch checklist (ops)
 

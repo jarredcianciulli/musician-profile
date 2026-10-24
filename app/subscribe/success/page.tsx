@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicShell } from "@/components/PublicShell";
 import { SubscribeCompleteBeacon } from "@/components/analytics/SubscribeCompleteBeacon";
+import { SubscribeSuccessConfirm } from "@/components/booking/SubscribeSuccessConfirm";
 
 export const metadata: Metadata = {
   title: "Subscription confirmed",
@@ -25,6 +26,7 @@ export default async function SubscribeSuccessPage({
         <h1 className="font-display text-4xl text-ink mt-2 mb-4">
           Your weekly spot is reserved
         </h1>
+        <SubscribeSuccessConfirm sessionId={session_id} />
         <p className="text-ink-soft leading-relaxed mb-6">
           Thanks — your subscription checkout completed
           {session_id ? " and payment was received" : ""}. You&apos;ll get a

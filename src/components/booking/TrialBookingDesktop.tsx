@@ -80,7 +80,7 @@ function TrialBookingDesktopPanel({ onClose }: Props) {
               variant="horizontal"
               tone="light"
               className="max-w-[220px]"
-              markClassName="w-5 h-9 text-sky-deep shrink-0"
+              markClassName="w-5 h-9 text-sky-ink shrink-0"
             />
           </Link>
           <button

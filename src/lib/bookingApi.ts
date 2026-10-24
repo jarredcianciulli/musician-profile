@@ -2,6 +2,7 @@ import {
   AvailabilityConfig,
   LessonBooking,
   LessonFormat,
+  StudioSubscription,
   TimeSlot,
 } from "../types/studio";
 import {
@@ -212,6 +213,24 @@ export async function fetchBookingBySession(
   return data;
 }
 
+export async function fetchSubscriptionBySession(
+  sessionId: string
+): Promise<{ subscription: StudioSubscription }> {
+  if (!apiBase) {
+    throw new Error("Subscription confirm requires the studio API.");
+  }
+  const res = await fetch(
+    `${apiBase}/studio/subscription/session?session_id=${encodeURIComponent(
+      sessionId
+    )}`
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not confirm subscription.");
+  }
+  return data as { subscription: StudioSubscription };
+}
+
 export async function startSubscriptionCheckout(input: {
   name: string;
   email: string;
@@ -235,6 +254,47 @@ export async function startSubscriptionCheckout(input: {
     throw new Error(data.error || "Could not start subscription checkout.");
   }
   return data;
+}
+
+export type AdminCheckoutResult = {
+  billingMode: "auto" | "manual";
+  checkoutUrl: string;
+  monthlyPaymentLinkUrl?: string;
+  sessionId: string;
+  reservationId: string;
+  proration: ProrationResult;
+  summary: string;
+};
+
+/** Admin-authenticated Checkout / Payment Link for a student. */
+export async function createAdminSubscriptionCheckout(
+  input: {
+    name: string;
+    email: string;
+    durationMinutes: 30 | 45 | 60;
+    start: string;
+    end: string;
+    format?: LessonFormat;
+    billingMode: "auto" | "manual";
+  },
+  adminToken: string
+): Promise<AdminCheckoutResult> {
+  if (!apiBase) {
+    throw new Error("Admin checkout requires the studio API.");
+  }
+  const res = await fetch(`${apiBase}/studio/subscription/admin-checkout`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${adminToken}`,
+    },
+    body: JSON.stringify(input),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not create payment link.");
+  }
+  return data as AdminCheckoutResult;
 }
 
 const RESERVATION_STORAGE_KEY = "bss_sub_reservation_id";

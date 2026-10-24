@@ -71,7 +71,7 @@ const Navbar: React.FC<Props> = ({ visible = true }) => {
               variant="horizontal"
               tone="light"
               className="max-w-[220px] sm:max-w-none"
-              markClassName="w-6 h-11 text-sky-deep shrink-0"
+              markClassName="w-6 h-11 text-sky-ink shrink-0"
             />
           </a>
 

@@ -2,7 +2,7 @@
  * Mid-month proration: first partial month billed per lesson at locked flat
  * rates ($42 / $57 / $81), then full monthly from the 1st.
  *
- * A subscription is ONE weekly lesson — preferredWeekday 1=Mon or 6=Sat.
+ * A subscription is ONE weekly lesson on any weekday 0–6 (Sun–Sat).
  */
 
 const RATES = { 30: 160, 45: 220, 60: 310 };
@@ -35,20 +35,34 @@ function zonedParts(date) {
 
 const WEEKDAY = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
-function windowEndHour(weekday) {
-  if (weekday === 1) return 20;
-  if (weekday === 6) return 11;
-  return null;
+/** End hour (0–23) for "still open today" — from weeklyHours or sensible defaults. */
+function windowEndHour(weekday, weeklyHours) {
+  if (Array.isArray(weeklyHours)) {
+    const wh = weeklyHours.find((h) => Number(h.day) === weekday && h.enabled);
+    if (wh?.end) {
+      const hour = Number(String(wh.end).split(":")[0]);
+      if (Number.isFinite(hour)) return hour;
+    }
+  }
+  if (weekday === 1) return 20; // Mon default
+  if (weekday === 6) return 11; // Sat default
+  return 23;
 }
 
-/** Count remaining Mon or Sat dates from `from` through day before `toExclusive`. */
-function countWeekdayOccurrences(from, toExclusive, preferredWeekday) {
+/** Count remaining preferred-weekday dates from `from` through day before `toExclusive`. */
+function countWeekdayOccurrences(
+  from,
+  toExclusive,
+  preferredWeekday,
+  weeklyHours
+) {
   const start = zonedParts(from);
   const end = zonedParts(toExclusive);
   let count = 0;
   let y = start.year;
   let m = start.month;
   let d = start.day;
+  const endH = windowEndHour(preferredWeekday, weeklyHours);
 
   for (let i = 0; i < 62; i++) {
     if (
@@ -62,9 +76,8 @@ function countWeekdayOccurrences(from, toExclusive, preferredWeekday) {
     const probe = new Date(Date.UTC(y, m - 1, d, 16, 0, 0));
     const p = zonedParts(probe);
     const wd = WEEKDAY[p.weekday];
-    const endH = windowEndHour(wd);
 
-    if (wd === preferredWeekday && endH !== null) {
+    if (wd === preferredWeekday) {
       const isToday =
         p.year === start.year &&
         p.month === start.month &&
@@ -86,6 +99,15 @@ function countWeekdayOccurrences(from, toExclusive, preferredWeekday) {
   return count;
 }
 
+export function weekdayFromDate(date, timeZone = TIME_ZONE) {
+  const label = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+  }).format(new Date(date));
+  const wd = WEEKDAY[label];
+  return typeof wd === "number" ? wd : null;
+}
+
 export function perLessonCents(durationMinutes) {
   const locked = PER_LESSON_CENTS[durationMinutes];
   if (locked != null) return locked;
@@ -98,13 +120,15 @@ export function computeProration({
   durationMinutes,
   preferredWeekday,
   startDate = new Date(),
+  weeklyHours,
 }) {
   const rate = RATES[durationMinutes];
   if (!rate) {
     throw new Error("Invalid lesson duration for subscription.");
   }
-  if (preferredWeekday !== 1 && preferredWeekday !== 6) {
-    throw new Error("Choose a weekly lesson day (Monday or Saturday).");
+  const wd = Number(preferredWeekday);
+  if (!Number.isInteger(wd) || wd < 0 || wd > 6) {
+    throw new Error("Choose a weekly lesson day.");
   }
 
   const start = new Date(startDate);
@@ -114,14 +138,15 @@ export function computeProration({
   const remainingLessons = countWeekdayOccurrences(
     start,
     nextMonth,
-    preferredWeekday
+    wd,
+    weeklyHours
   );
   const lessonCents = PER_LESSON_CENTS[durationMinutes];
   const prorateCents = remainingLessons * lessonCents;
 
   return {
     durationMinutes,
-    preferredWeekday,
+    preferredWeekday: wd,
     monthlyRate: rate,
     monthlyRateCents: rate * 100,
     perLessonCents: lessonCents,

@@ -22,10 +22,10 @@ const LogoLockup: React.FC<Props> = ({
   className = "",
   markClassName,
 }) => {
-  const ink = tone === "light" ? "text-ink" : "text-paper";
-  const accent = tone === "light" ? "text-sky-deep" : "text-sky";
+  const ink = tone === "light" ? "text-sky-ink" : "text-paper";
+  const accent = tone === "light" ? "text-sky-ink" : "text-sky";
   const muted = tone === "light" ? "text-muted" : "text-paper/55";
-  const rule = tone === "light" ? "bg-sky-deep" : "bg-sky";
+  const rule = tone === "light" ? "bg-sky-ink" : "bg-sky";
 
   const mark =
     markClassName ||

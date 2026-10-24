@@ -109,8 +109,10 @@ npx wrangler deploy --env staging
 | Optional hostname | `booking-api-staging.batterystringstudio.com` (Workers Domains + DNS) | `booking-api…` |
 | Stripe | test | live |
 
-Test webhook: `https://studio-api-staging.batterystringstudio.workers.dev/studio/booking/webhook`  
+Test webhook: `https://studio-api-staging.batterystringstudio.workers.dev/studio/booking/webhook`
 Events: `checkout.session.completed`, `checkout.session.expired`.
+
+Success-URL fallbacks (if webhook lags): trial `GET /studio/booking/session`, subscribe `GET /studio/subscription/session`.
 
 Staging site `NEXT_PUBLIC_STUDIO_API` must point at the staging Worker (deploy workflow sets this on `staging` branch).
 
@@ -150,11 +152,15 @@ PII (name, email, phone, slot) stays in **studio-api KV → `/admin` Leads**. Do
 | Event | When |
 |-------|------|
 | `subscribe_opened` | Weekly subscribe flow opened |
-| `subscribe_step` | Subscribe wizard step |
+| `subscribe_step` | Subscribe wizard step (1–5) |
 | `subscribe_checkout_start` | Redirect to Stripe |
 | `subscribe_cancel` | Returned from Stripe cancel |
 | `subscribe_complete` | `/subscribe/success` |
-| `trial_*` | Same pattern for `/trial` |
+| `trial_opened` | Trial flow opened (desktop overlay or `/trial`) |
+| `trial_step` | Trial wizard step (1–4) |
+| `trial_checkout_start` | Redirect to Stripe |
+| `trial_cancel` | Returned from Stripe cancel |
+| `trial_complete` | Trial paid / confirmed |
 | `lead_form_submit` | `/lead` form success |
 
 4. In Zaraz, create triggers on those event names if you want them in GA4 reports.
@@ -174,7 +180,7 @@ Complete the profile (service-area / hide street address to match the site):
 | Website | `https://batterystringstudio.com` |
 | Booking URL | `https://batterystringstudio.com/trial` |
 | Description | Private violin and viola lessons in the Bowan Village / Charleston area with Jarred Cianciulli. $35 trial lessons; weekly subscriptions. All ages. |
-| Logo | `public/brand/bss-nav-lockup-250.png` (250×250) |
+| Logo | `public/brand/bss-stripe-icon.png` (512×512) — mark fills square for Checkout |
 | Cover | `public/brand/lockup-horizontal.png` or a teaching photo |
 
 Then: finish verification → add photos → ask for Google reviews → Search Console submit `https://batterystringstudio.com/sitemap.xml`.

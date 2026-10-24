@@ -129,7 +129,7 @@ const TrialBookingMobile: React.FC<Props> = ({ onClose }) => {
             variant="horizontal"
             tone="light"
             className="max-w-[160px]"
-            markClassName="w-5 h-8 text-sky-deep shrink-0"
+            markClassName="w-5 h-8 text-sky-ink shrink-0"
           />
           {closeControl}
         </header>

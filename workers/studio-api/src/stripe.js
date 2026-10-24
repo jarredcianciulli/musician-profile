@@ -176,6 +176,72 @@ export async function createSubscriptionCheckoutSession(env, {
   return stripeRequest(env, "POST", "/checkout/sessions", body);
 }
 
+/** One-time Checkout for mid-month proration (manual billing path). */
+export async function createProrationPaymentSession(env, {
+  email,
+  name,
+  durationMinutes,
+  prorateCents,
+  successUrl,
+  cancelUrl,
+  metadata = {},
+}) {
+  if (!prorateCents || prorateCents <= 0) {
+    throw new Error("Nothing to charge for the partial month.");
+  }
+  return stripeRequest(env, "POST", "/checkout/sessions", {
+    mode: "payment",
+    customer_email: email,
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    line_items: [
+      {
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          unit_amount: prorateCents,
+          product_data: {
+            name: `First-month lessons (${durationMinutes} min)`,
+            description: "Remaining lessons this month — Battery String Studio",
+          },
+        },
+      },
+    ],
+    metadata: {
+      name,
+      type: "manual_proration",
+      durationMinutes: String(durationMinutes),
+      ...metadata,
+    },
+  });
+}
+
+/**
+ * Reusable Payment Link for monthly tuition (manual billing).
+ * Uses STRIPE_PRICE_{mins} when set; otherwise creates a one-off Price.
+ */
+export async function createMonthlyPaymentLink(env, {
+  durationMinutes,
+  monthlyRateCents,
+  priceId,
+}) {
+  let price = priceId || "";
+  if (!price) {
+    const created = await stripeRequest(env, "POST", "/prices", {
+      currency: "usd",
+      unit_amount: monthlyRateCents,
+      product_data: {
+        name: `Weekly ${durationMinutes}-min lessons (monthly tuition)`,
+      },
+    });
+    price = created.id;
+  }
+  const link = await stripeRequest(env, "POST", "/payment_links", {
+    line_items: [{ price, quantity: 1 }],
+  });
+  return { url: link.url, id: link.id, priceId: price };
+}
+
 function timingSafeEqual(a, b) {
   if (a.length !== b.length) return false;
   let out = 0;

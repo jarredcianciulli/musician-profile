@@ -13,6 +13,7 @@ module.exports = {
         "paper-muted": "var(--color-paper-muted)",
         sky: "var(--color-sky)",
         "sky-deep": "var(--color-sky-deep)",
+        "sky-ink": "var(--color-sky-ink)",
         gold: "var(--color-gold)",
         "gold-deep": "var(--color-gold-deep)",
         accent: "var(--color-accent)",

@@ -47,6 +47,16 @@ export function useTrialBooking(flyerCode?: string) {
     flyerCode || searchParams.get("f") || searchParams.get("flyer") || "";
 
   useEffect(() => {
+    if (successParam) return;
+    analytics.trialOpened();
+  }, [successParam]);
+
+  useEffect(() => {
+    if (successParam || success) return;
+    analytics.trialStep(step);
+  }, [step, successParam, success]);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       if (successParam && sessionId) {
@@ -57,6 +67,7 @@ export function useTrialBooking(flyerCode?: string) {
           setConfirmation(result.confirmation);
           setSuccess(true);
           analytics.bookingCompleted();
+          analytics.trialComplete();
         } catch (err) {
           if (!cancelled) {
             setError(
@@ -77,6 +88,8 @@ export function useTrialBooking(flyerCode?: string) {
           instructions:
             "Local demo booking saved. Connect Stripe + studio-api for live payments.",
         });
+        analytics.bookingCompleted();
+        analytics.trialComplete();
         setLoading(false);
         return;
       }
