@@ -397,6 +397,11 @@ export async function inviteStudent(
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    if (res.status === 404) {
+      throw new Error(
+        "Invite API not found (404). Deploy studio-api: cd workers/studio-api && npx wrangler login && npx wrangler deploy"
+      );
+    }
     throw new Error(data.error || "Could not send invite.");
   }
   return data as StudentInviteResult;

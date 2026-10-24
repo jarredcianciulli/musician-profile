@@ -233,9 +233,10 @@ const Admin: React.FC = () => {
       const refreshed = await loadStudio({ includePrivate: true });
       setPayload(refreshed);
     } catch (err) {
-      setInviteError(
-        err instanceof Error ? err.message : "Could not send invite."
-      );
+      const msg =
+        err instanceof Error ? err.message : "Could not send invite.";
+      setInviteError(msg);
+      setStatus(msg);
     } finally {
       setInviteSubmitting(false);
     }
