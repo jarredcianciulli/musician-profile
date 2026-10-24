@@ -64,6 +64,22 @@ export async function retrieveCheckoutSession(env, sessionId) {
   );
 }
 
+/** Expire an open Checkout Session so the old amount can no longer be paid. */
+export async function expireCheckoutSession(env, sessionId) {
+  if (!sessionId) return null;
+  try {
+    return await stripeRequest(
+      env,
+      "POST",
+      `/checkout/sessions/${encodeURIComponent(sessionId)}/expire`
+    );
+  } catch (err) {
+    // Already complete/expired — fine to ignore
+    console.error("expireCheckoutSession:", err?.message || err);
+    return null;
+  }
+}
+
 export async function createTrialCheckoutSession(env, {
   bookingId,
   email,

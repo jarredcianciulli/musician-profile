@@ -5,6 +5,7 @@
 import {
   createSubscriptionCheckoutSession,
   createProrationPaymentSession,
+  expireCheckoutSession,
 } from "./stripe.js";
 import { computeProration, weekdayFromDate } from "./proration.js";
 import { sendStudentInviteEmail, sendSubscriptionBookedEmails } from "./mailers.js";
@@ -53,7 +54,12 @@ function portalPayload(enrollment, payload) {
   const months = enrollment.scheduleMonths || 12;
   const schedule = buildSchedule(enrollment, payload.holidays, months);
   const payments = (payload.payments || [])
-    .filter((p) => p.enrollmentId === enrollment.id)
+    .filter(
+      (p) =>
+        p.enrollmentId === enrollment.id &&
+        p.status !== "cancelled" &&
+        p.status !== "canceled"
+    )
     .slice(0, 40);
   return {
     enrollment: publicEnrollment(enrollment),
@@ -84,6 +90,40 @@ function updateEnrollment(payload, enrollment) {
     ...payload,
     enrollments,
     updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Expire any open Stripe Checkout for this enrollment and void pending payment rows
+ * so a new session can be created with the current amount due.
+ */
+async function invalidatePendingCheckout(env, payload, enrollment) {
+  const sid = enrollment.pendingCheckoutSessionId || "";
+  if (sid) {
+    await expireCheckoutSession(env, sid);
+  }
+  const payments = (payload.payments || []).map((p) => {
+    if (
+      p.enrollmentId === enrollment.id &&
+      p.status === "pending" &&
+      (!sid || p.stripeSessionId === sid || !p.stripeSessionId)
+    ) {
+      return {
+        ...p,
+        status: "cancelled",
+        cancelledAt: new Date().toISOString(),
+      };
+    }
+    return p;
+  });
+  return {
+    enrollment: {
+      ...enrollment,
+      pendingCheckoutSessionId: "",
+      pendingCheckoutMode: "",
+      updatedAt: new Date().toISOString(),
+    },
+    payments,
   };
 }
 
@@ -128,6 +168,22 @@ export async function handleStudentRoutes({
       scheduleMonths = 12;
     }
     scheduleMonths = Math.min(24, Math.round(scheduleMonths));
+    const amountDollarsRaw = body?.amountDollars;
+    const hasCustomAmount =
+      amountDollarsRaw !== undefined &&
+      amountDollarsRaw !== null &&
+      String(amountDollarsRaw).trim() !== "";
+    const amountDollars = hasCustomAmount ? Number(amountDollarsRaw) : NaN;
+    if (
+      hasCustomAmount &&
+      (!Number.isFinite(amountDollars) || amountDollars < 0 || amountDollars > 5000)
+    ) {
+      return json(
+        { error: "amountDollars must be between 0 and 5000 when set." },
+        400,
+        origin
+      );
+    }
     if (!name || !email || !start || !end) {
       return json(
         { error: "name, email, start, and end are required." },
@@ -194,6 +250,22 @@ export async function handleStudentRoutes({
       payload.availability?.weeklyHours
     );
     delete enrollment._proration;
+
+    if (hasCustomAmount) {
+      enrollment = {
+        ...enrollment,
+        amountDueCents: Math.round(amountDollars * 100),
+        amountDueLocked: true,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Re-invite / amount change: drop any open Checkout at the old price
+    {
+      const cleared = await invalidatePendingCheckout(env, payload, enrollment);
+      enrollment = cleared.enrollment;
+      payload = { ...payload, payments: cleared.payments };
+    }
 
     const issued = await issueMagicLink(enrollment);
     enrollment = issued.enrollment;
@@ -298,6 +370,13 @@ export async function handleStudentRoutes({
       delete enrollment._proration;
     }
 
+    // Old Stripe Checkout / pending payment rows used the previous amount
+    {
+      const cleared = await invalidatePendingCheckout(env, payload, enrollment);
+      enrollment = cleared.enrollment;
+      payload = { ...payload, payments: cleared.payments };
+    }
+
     payload = updateEnrollment(payload, enrollment);
     await writePayload(env, payload);
     return json(
@@ -308,6 +387,7 @@ export async function handleStudentRoutes({
           enrollment,
           payload.availability?.weeklyHours
         ),
+        pendingCheckoutCleared: true,
       },
       200,
       origin
@@ -477,6 +557,14 @@ export async function handleStudentRoutes({
     );
     const prorationHint = enrollment._proration;
     delete enrollment._proration;
+
+    // Always mint a fresh Checkout at the current amount due
+    {
+      const cleared = await invalidatePendingCheckout(env, payload, enrollment);
+      enrollment = cleared.enrollment;
+      payload = { ...payload, payments: cleared.payments };
+      payload = updateEnrollment(payload, enrollment);
+    }
 
     const successUrl = appendReturnQuery(
       accountPath(env, "?paid=1&session_id={CHECKOUT_SESSION_ID}"),

@@ -116,6 +116,7 @@ const Admin: React.FC = () => {
     "manual"
   );
   const [inviteScheduleMonths, setInviteScheduleMonths] = useState(12);
+  const [inviteAmountDollars, setInviteAmountDollars] = useState("");
   const [inviteSlots, setInviteSlots] = useState<
     { start: string; end: string; label: string }[]
   >([]);
@@ -247,6 +248,16 @@ const Admin: React.FC = () => {
 
     setInviteSubmitting(true);
     try {
+      const customDue = inviteAmountDollars.trim();
+      const amountDollars = customDue === "" ? undefined : Number(customDue);
+      if (
+        customDue !== "" &&
+        (!Number.isFinite(amountDollars) || (amountDollars as number) < 0)
+      ) {
+        setInviteError("First-period amount must be a valid dollar amount.");
+        setInviteSubmitting(false);
+        return;
+      }
       const result = await inviteStudent(
         {
           name: inviteName.trim(),
@@ -257,6 +268,7 @@ const Admin: React.FC = () => {
           format: inviteFormat,
           billingMode: inviteBilling,
           scheduleMonths: inviteScheduleMonths,
+          amountDollars,
         },
         token
       );
@@ -326,8 +338,8 @@ const Admin: React.FC = () => {
       }));
       setStatus(
         clear
-          ? "Amount due reset to calculated proration."
-          : `Amount due set to $${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}.`
+          ? "Amount due reset to calculated proration. Any open Stripe checkout was cancelled."
+          : `Amount due set to $${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}. Open Stripe checkout (if any) was cancelled — student gets a fresh session on next pay.`
       );
     } catch (err) {
       setStatus(
@@ -976,6 +988,27 @@ const Admin: React.FC = () => {
                   ))}
                 </select>
               </label>
+              <label className="text-sm block sm:col-span-2 lg:col-span-4">
+                <span className="text-muted text-xs uppercase tracking-wider">
+                  First-period amount (optional)
+                </span>
+                <div className="relative mt-1 max-w-xs">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-xs">
+                    $
+                  </span>
+                  <input
+                    className="admin-input w-full pl-7"
+                    inputMode="decimal"
+                    placeholder="Leave blank for auto (e.g. 110)"
+                    value={inviteAmountDollars}
+                    onChange={(e) => setInviteAmountDollars(e.target.value)}
+                  />
+                </div>
+                <span className="block text-xs text-muted mt-1">
+                  Set before sending if you quoted a custom total. Otherwise we
+                  calculate remaining lessons × per-lesson rate.
+                </span>
+              </label>
             </div>
             <fieldset className="space-y-3">
               <legend className="text-muted text-xs uppercase tracking-wider">
@@ -1003,7 +1036,8 @@ const Admin: React.FC = () => {
                   />
                   <span className="block text-xs text-muted mt-1">
                     Example: today&apos;s Friday time even if it already
-                    started. Proration counts remaining lessons from now.
+                    started. Proration counts remaining lessons from this first
+                    lesson date through month-end.
                   </span>
                 </label>
               ) : null}
@@ -1189,6 +1223,8 @@ const Admin: React.FC = () => {
                         <p className="text-xs text-muted mt-1">
                           Calculated from first lesson date × per-lesson rate.
                           Override when you quoted a custom total (e.g. $110).
+                          Saving cancels any open Stripe checkout so the next
+                          pay uses this amount.
                         </p>
                       </div>
                       {pendingMagicUrls[enr.id] ? (

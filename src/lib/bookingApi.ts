@@ -456,6 +456,8 @@ export async function inviteStudent(
     billingMode?: "manual" | "auto";
     /** Months of schedule to show / calendar-export. Default 12. */
     scheduleMonths?: number;
+    /** Optional custom first-period amount (e.g. 110). Omit to use calculated proration. */
+    amountDollars?: number;
   },
   adminToken: string
 ): Promise<StudentInviteResult> {
