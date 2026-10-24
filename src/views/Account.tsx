@@ -17,7 +17,7 @@ import {
   googleCalendarUrlForLesson,
 } from "../lib/accountCalendar";
 import { formatSlotDay, formatSlotTime } from "../lib/slots";
-import { marketingSiteUrl } from "../lib/env";
+import { marketingSiteUrl, studioEmail } from "../lib/env";
 
 const TZ = "America/New_York";
 
@@ -167,11 +167,21 @@ const Account: React.FC = () => {
           Student account
         </p>
         <h1 className="font-display text-4xl text-ink mt-2 mb-3">
-          Sign in with email
+          Need a sign-in link?
         </h1>
-        <p className="text-ink-soft mb-8 leading-relaxed">
-          Enter the email on your studio invite. We&apos;ll send a magic link —
-          no password.
+        <p className="text-ink-soft mb-6 leading-relaxed">
+          Open the magic link from your invite email, or email the studio for a
+          fresh one — we&apos;ll resend it from Admin.
+        </p>
+        <p className="mb-8">
+          <a
+            className="btn-primary inline-flex"
+            href={`mailto:${studioEmail()}?subject=${encodeURIComponent(
+              "Please resend my Battery String Studio account link"
+            )}`}
+          >
+            Email {studioEmail()}
+          </a>
         </p>
         {error ? (
           <p className="text-sm text-accent mb-4" role="alert">
@@ -184,28 +194,33 @@ const Account: React.FC = () => {
             inbox (and spam).
           </p>
         ) : null}
-        <form onSubmit={onRequestLink} className="space-y-4">
-          <label className="block text-sm">
-            <span className="text-muted text-xs uppercase tracking-wider">
-              Email
-            </span>
-            <input
-              type="email"
-              className="admin-input mt-1 w-full"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
-          </label>
-          <button
-            type="submit"
-            className="btn-primary w-full"
-            disabled={requesting || !email.trim()}
-          >
-            {requesting ? "Sending…" : "Email me a sign-in link"}
-          </button>
-        </form>
+        <details className="text-sm text-muted">
+          <summary className="cursor-pointer hover:text-ink">
+            Already invited? Request a link to this email
+          </summary>
+          <form onSubmit={onRequestLink} className="space-y-4 mt-4">
+            <label className="block text-sm text-ink">
+              <span className="text-muted text-xs uppercase tracking-wider">
+                Email
+              </span>
+              <input
+                type="email"
+                className="admin-input mt-1 w-full"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
+            </label>
+            <button
+              type="submit"
+              className="btn-secondary w-full"
+              disabled={requesting || !email.trim()}
+            >
+              {requesting ? "Sending…" : "Email me a sign-in link"}
+            </button>
+          </form>
+        </details>
         <p className="text-sm text-muted mt-8">
           <a
             href={marketingSiteUrl()}

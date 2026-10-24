@@ -164,11 +164,21 @@ export async function createSubscriptionCheckoutSession(env, {
         ...metadata,
       },
     },
+    // Stripe UI may say “Pay and start trial” when first monthly charge is delayed
+    // to the 1st — that delay is not a free trial; this is a real subscription.
+    custom_text: {
+      submit: {
+        message:
+          prorateCents > 0
+            ? "Today you pay for remaining lessons this month. Your monthly subscription then renews on the 1st."
+            : "Monthly subscription for your weekly lesson spot.",
+      },
+    },
   };
 
-  // Mid-month: charge one-time proration now, first recurring invoice at next
-  // month. Do NOT set billing_cycle_anchor + proration_behavior=none — Stripe
-  // rejects that combo when line_items include a one-time price.
+  // Mid-month: charge one-time proration now; first recurring invoice on the 1st.
+  // Stripe only allows this delay via trial_end when a one-time line item is
+  // present (billing_cycle_anchor + one-time is rejected). Not a free trial.
   if (billingCycleAnchor) {
     body.subscription_data.trial_end = billingCycleAnchor;
   }

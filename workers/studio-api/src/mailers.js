@@ -185,7 +185,7 @@ export async function sendStudentInviteEmail(
       <h2 style="font-weight:600">Welcome${name ? `, ${escapeHtml(name)}` : ""}</h2>
       ${billingBlurb}
       <p><a href="${escapeHtml(magicUrl)}" style="display:inline-block;padding:12px 18px;background:#1b3a5c;color:#fff;text-decoration:none">Open your account</a></p>
-      <p style="font-size:13px;color:#666">This link expires in 48 hours. You can request a new one from the account page.</p>
+      <p style="font-size:13px;color:#666">This link expires in 48 hours. If it expires or you need a new one, email <a href="mailto:${escapeHtml(inbox)}">${escapeHtml(inbox)}</a> and we&apos;ll resend it.</p>
     `),
     replyTo: { email: inbox, name: "Battery String Studio" },
   });

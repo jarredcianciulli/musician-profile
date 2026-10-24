@@ -454,6 +454,18 @@ const Admin: React.FC = () => {
     .filter((b) => b.status !== "cancelled")
     .sort((a, b) => a.start.localeCompare(b.start));
 
+  const enrollments = payload.enrollments || [];
+  const pendingInvites = enrollments.filter((e) => {
+    if (e.status === "invited") return true;
+    // Invited / not yet paid for the period, and no active auto subscription
+    if (e.stripeSubscriptionId) return false;
+    if (e.paidThroughPeriodKey) return false;
+    return true;
+  });
+  const activeEnrollments = enrollments.filter(
+    (e) => !pendingInvites.some((p) => p.id === e.id)
+  );
+
   return (
     <div className="min-h-screen bg-paper text-ink">
       <header className="border-b border-line bg-white sticky top-0 z-10">
@@ -954,11 +966,63 @@ const Admin: React.FC = () => {
             ) : null}
           </form>
 
-          {(payload.enrollments || []).length > 0 ? (
-            <div className="mt-8 max-w-2xl">
-              <h3 className="font-display text-xl mb-3">Enrolled students</h3>
+          {pendingInvites.length > 0 ? (
+            <div className="mt-8 max-w-2xl border border-sky-deep/30 bg-paper-muted/30 p-5">
+              <h3 className="font-display text-xl mb-1">Pending invites</h3>
+              <p className="text-sm text-muted mb-4">
+                Haven&apos;t finished billing setup yet. Resend their magic
+                link anytime (also emailed).
+              </p>
               <ul className="space-y-2">
-                {[...(payload.enrollments || [])]
+                {[...pendingInvites]
+                  .sort((a, b) =>
+                    (b.createdAt || "").localeCompare(a.createdAt || "")
+                  )
+                  .map((enr) => (
+                    <li
+                      key={enr.id}
+                      className="bg-white border border-line px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm"
+                    >
+                      <div>
+                        <p className="font-medium">{enr.name}</p>
+                        <p className="text-muted">
+                          {enr.email} · {enr.durationMinutes} min ·{" "}
+                          {enr.billingMode === "auto"
+                            ? "auto-charge"
+                            : "pay by link"}
+                          {typeof enr.amountDueCents === "number" &&
+                          enr.amountDueCents > 0
+                            ? ` · due $${(enr.amountDueCents / 100).toFixed(
+                                enr.amountDueCents % 100 === 0 ? 0 : 2
+                              )}`
+                            : ""}
+                        </p>
+                        <p className="text-xs text-muted mt-0.5">
+                          {formatSlotDay(enr.slotStart, tz)} ·{" "}
+                          {formatSlotTime(enr.slotStart, tz)} · {enr.status}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-primary shrink-0 text-xs"
+                        disabled={resendBusyId === enr.id}
+                        onClick={() => resendInvite(enr.id)}
+                      >
+                        {resendBusyId === enr.id
+                          ? "Sending…"
+                          : "Resend magic link"}
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {activeEnrollments.length > 0 ? (
+            <div className="mt-8 max-w-2xl">
+              <h3 className="font-display text-xl mb-3">Active students</h3>
+              <ul className="space-y-2">
+                {[...activeEnrollments]
                   .sort((a, b) =>
                     (b.createdAt || "").localeCompare(a.createdAt || "")
                   )
@@ -972,10 +1036,8 @@ const Admin: React.FC = () => {
                         <p className="text-muted">
                           {enr.email} · {enr.durationMinutes} min ·{" "}
                           {enr.billingMode || "unset"}
-                          {typeof enr.amountDueCents === "number"
-                            ? ` · due $${(enr.amountDueCents / 100).toFixed(
-                                enr.amountDueCents % 100 === 0 ? 0 : 2
-                              )}`
+                          {enr.paidThroughPeriodKey
+                            ? ` · paid through ${enr.paidThroughPeriodKey}`
                             : ""}
                         </p>
                         <p className="text-xs text-muted mt-0.5">
