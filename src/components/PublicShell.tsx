@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
 import IntroSplash, { shouldPlayIntro } from "./brand/IntroSplash";
@@ -28,11 +29,24 @@ function hasBookingIntent(): boolean {
   });
 }
 
+/** Intro is a home-only brand moment — skip on /policy, /lead, SEO pages, etc. */
+function isHomePath(pathname: string | null): boolean {
+  return !pathname || pathname === "/";
+}
+
 export function PublicShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [showIntro, setShowIntro] = useState(false);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    // Policy, lead, SEO pages, etc. — go straight to content
+    if (!isHomePath(pathname)) {
+      setShowIntro(false);
+      setReady(true);
+      return;
+    }
+    // Returning from booking/checkout: skip splash and don't replay later
     if (hasBookingIntent()) {
       try {
         sessionStorage.setItem(INTRO_KEY, "1");
@@ -46,7 +60,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
     const play = shouldPlayIntro();
     setShowIntro(play);
     setReady(!play);
-  }, []);
+  }, [pathname]);
 
   const finishIntro = useCallback(() => {
     setShowIntro(false);
