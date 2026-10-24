@@ -1,3 +1,4 @@
+/** Fallback / seed content — live copies live in studio KV (`policies`). */
 export const STUDIO_POLICY_TITLE = "Battery String Studio — Studio Policy";
 
 export const STUDIO_POLICY_SECTIONS: { heading: string; body: string }[] = [
@@ -42,3 +43,49 @@ export const STUDIO_POLICY_SECTIONS: { heading: string; body: string }[] = [
     body: "Questions about any of this? Just ask — I'd rather everything be clear up front.",
   },
 ];
+
+export const FALLBACK_STUDIO_POLICY = {
+  id: "policy-fallback",
+  title: STUDIO_POLICY_TITLE,
+  startDate: "2026-10-01",
+  expiresAt: null as string | null,
+  sections: STUDIO_POLICY_SECTIONS,
+};
+
+export function formatPolicyEffectiveDate(startDate: string): string {
+  if (!startDate) return "";
+  const d = new Date(`${startDate.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return startDate;
+  return d.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "America/New_York",
+  });
+}
+
+/** expiresAt null = in force; among those, newest startDate wins. */
+export function selectCurrentPolicy<
+  T extends { startDate: string; expiresAt?: string | null },
+>(policies: T[]): T | null {
+  if (!policies?.length) return null;
+  const open = policies.filter((p) => !p.expiresAt);
+  if (open.length) {
+    return [...open].sort((a, b) =>
+      b.startDate.localeCompare(a.startDate)
+    )[0];
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const inWindow = policies.filter(
+    (p) =>
+      p.startDate <= today && (!p.expiresAt || p.expiresAt > today)
+  );
+  if (inWindow.length) {
+    return [...inWindow].sort((a, b) =>
+      b.startDate.localeCompare(a.startDate)
+    )[0];
+  }
+  return [...policies].sort((a, b) =>
+    b.startDate.localeCompare(a.startDate)
+  )[0];
+}

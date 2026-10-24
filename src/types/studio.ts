@@ -183,6 +183,23 @@ export type StudentPayment = {
   createdAt?: string;
 };
 
+export type StudioPolicySection = {
+  heading: string;
+  body: string;
+};
+
+/** Versioned studio policy. `expiresAt` null means currently in force. */
+export type StudioPolicyVersion = {
+  id: string;
+  title: string;
+  /** YYYY-MM-DD — effective / start date shown publicly */
+  startDate: string;
+  /** YYYY-MM-DD or null — null = still in place */
+  expiresAt: string | null;
+  sections: StudioPolicySection[];
+  createdAt?: string;
+};
+
 export type StudioPayload = {
   holidays: HolidayWeek[];
   events: StudioEvent[];
@@ -195,6 +212,8 @@ export type StudioPayload = {
   payments?: StudentPayment[];
   flyers?: FlyerCampaign[];
   leads?: StudioLead[];
+  /** Versioned studio policies; current = expiresAt null, newest startDate */
+  policies?: StudioPolicyVersion[];
   updatedAt: string;
 };
 

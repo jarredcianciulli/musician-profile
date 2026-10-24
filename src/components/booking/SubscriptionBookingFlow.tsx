@@ -23,16 +23,13 @@ import {
   computeProration,
   weekdayFromDate,
 } from "@/lib/subscriptionProration";
-import {
-  STUDIO_POLICY_SECTIONS,
-  STUDIO_POLICY_TITLE,
-} from "@/content/studioPolicy";
 import { LessonFormat, TimeSlot } from "@/types/studio";
 import { lockBodyScroll, unlockBodyScroll } from "@/lib/scrollLock";
 import Link from "next/link";
 import LogoLockup from "@/components/brand/LogoLockup";
 import { brand } from "@/config/brand";
 import BookingDayPicker from "@/components/booking/BookingDayPicker";
+import StudioPolicyBody from "@/components/StudioPolicyBody";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -450,17 +447,7 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
 
           {step === 4 && (
             <div className="space-y-4">
-              <h3 className="font-display text-xl text-ink">
-                {STUDIO_POLICY_TITLE}
-              </h3>
-              <div className="max-h-64 overflow-y-auto border border-line bg-white px-3 py-3 space-y-3 text-sm text-ink-soft">
-                {STUDIO_POLICY_SECTIONS.map((s) => (
-                  <div key={s.heading}>
-                    <p className="font-semibold text-ink">{s.heading}</p>
-                    <p className="mt-1 leading-relaxed">{s.body}</p>
-                  </div>
-                ))}
-              </div>
+              <StudioPolicyBody variant="scroll" showTitle />
               <label className="flex items-start gap-3 text-sm cursor-pointer">
                 <input
                   type="checkbox"
@@ -473,6 +460,11 @@ const SubscriptionBookingFlow: React.FC<Props> = ({
                   tuition reserves this weekly time whether or not I attend.
                 </span>
               </label>
+              <p className="text-xs text-muted">
+                <Link href="/policy" className="underline underline-offset-2">
+                  Open full policy page
+                </Link>
+              </p>
             </div>
           )}
 

@@ -26,10 +26,7 @@ import {
 import { formatSlotDay, formatSlotTime } from "../lib/slots";
 import { marketingSiteUrl, studioEmail } from "../lib/env";
 import { collectReturnQuery } from "../lib/returnQuery";
-import {
-  STUDIO_POLICY_SECTIONS,
-  STUDIO_POLICY_TITLE,
-} from "../content/studioPolicy";
+import StudioPolicyBody from "../components/StudioPolicyBody";
 
 const SCHEDULE_COLLAPSE_KEY = "bss_account_schedule_open";
 
@@ -288,7 +285,7 @@ const Account: React.FC = () => {
     return (
       <div className="section-container py-16 max-w-md">
         <p className="text-[11px] uppercase tracking-[0.18em] text-sky-deep font-semibold">
-          Student account
+          Account
         </p>
         <h1 className="font-display text-4xl text-ink mt-2 mb-3">
           Need a sign-in link?
@@ -819,27 +816,17 @@ const Account: React.FC = () => {
             <>
               {needsCheckout && !policyDone ? (
                 <div className="border border-line bg-white px-4 py-4 text-sm space-y-3 mb-4">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <h3 className="font-account text-lg text-ink">
-                      {STUDIO_POLICY_TITLE}
-                    </h3>
+                  <StudioPolicyBody variant="scroll" showTitle />
+                  <p className="text-xs text-muted">
                     <a
                       href={`${marketingSiteUrl()}/policy`}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-xs text-sky-deep underline underline-offset-2 shrink-0"
+                      className="text-sky-deep underline underline-offset-2"
                     >
-                      Full page
+                      Open full policy page
                     </a>
-                  </div>
-                  <div className="max-h-48 overflow-y-auto border border-line bg-paper px-3 py-3 space-y-3 text-ink-soft">
-                    {STUDIO_POLICY_SECTIONS.map((s) => (
-                      <div key={s.heading}>
-                        <p className="font-semibold text-ink">{s.heading}</p>
-                        <p className="mt-1 leading-relaxed">{s.body}</p>
-                      </div>
-                    ))}
-                  </div>
+                  </p>
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input
                       type="checkbox"

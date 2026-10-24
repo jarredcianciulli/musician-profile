@@ -26,6 +26,11 @@ import {
   confirmEnrollmentFromSession,
 } from "./studentRoutes.js";
 import { appendReturnQuery, sanitizeReturnQuery } from "./returnQuery.js";
+import {
+  defaultPolicies,
+  normalizePolicies,
+  publicCurrentPolicy,
+} from "./policies.js";
 
 const STORE_KEY = "studio_payload_v2";
 const HOLD_TTL_MS = 20 * 60 * 1000;
@@ -79,6 +84,7 @@ const seed = {
   payments: [],
   leads: [],
   flyers: seedFlyers,
+  policies: defaultPolicies(),
   holidays: [
     {
       id: "holiday-thanksgiving-2026",
@@ -191,6 +197,7 @@ function normalizePayload(raw) {
     flyers: Array.isArray(raw.flyers) && raw.flyers.length
       ? raw.flyers
       : base.flyers,
+    policies: normalizePolicies(raw.policies),
     updatedAt: raw.updatedAt || new Date().toISOString(),
   };
 }
@@ -876,6 +883,32 @@ export default {
       return json(publicStudio(payload), 200, origin);
     }
 
+    if (request.method === "GET" && route === "/studio/policy") {
+      const raw = env.STUDIO_KV
+        ? (await env.STUDIO_KV.get(STORE_KEY, "json")) ||
+          (await env.STUDIO_KV.get("studio_payload_v1", "json"))
+        : null;
+      const hadPolicies =
+        Array.isArray(raw?.policies) && raw.policies.length > 0;
+      let payload = await readPayload(env);
+      if (!hadPolicies) {
+        try {
+          await writePayload(env, {
+            ...payload,
+            policies: normalizePolicies(payload.policies),
+            updatedAt: new Date().toISOString(),
+          });
+        } catch (err) {
+          console.error("Could not seed policies:", err);
+        }
+      }
+      const current = publicCurrentPolicy(payload.policies);
+      if (!current) {
+        return json({ error: "No studio policy on file." }, 404, origin);
+      }
+      return json(current, 200, origin);
+    }
+
     if (request.method === "GET" && route === "/studio/admin") {
       const token = getBearer(request);
       if (!env.ADMIN_TOKEN || token !== env.ADMIN_TOKEN) {
@@ -916,6 +949,9 @@ export default {
           : current.payments,
         leads: Array.isArray(body.leads) ? body.leads : current.leads,
         flyers: Array.isArray(body.flyers) ? body.flyers : current.flyers,
+        policies: Array.isArray(body.policies)
+          ? body.policies
+          : current.policies,
         updatedAt: new Date().toISOString(),
       });
       if (!isValidPayload(next)) {

@@ -1,4 +1,5 @@
 import { defaultAvailability, seedStudio } from "../data/seedStudio";
+import { FALLBACK_STUDIO_POLICY } from "../content/studioPolicy";
 import { AvailabilityConfig, StudioPayload } from "../types/studio";
 
 export function normalizeAvailability(
@@ -41,6 +42,17 @@ export function normalizeStudioPayload(
     leads: Array.isArray(payload.leads) ? payload.leads : [],
     enrollments: Array.isArray(payload.enrollments) ? payload.enrollments : [],
     payments: Array.isArray(payload.payments) ? payload.payments : [],
+    policies:
+      Array.isArray(payload.policies) && payload.policies.length
+        ? payload.policies
+        : seed.policies?.length
+          ? seed.policies
+          : [
+              {
+                ...FALLBACK_STUDIO_POLICY,
+                expiresAt: null,
+              },
+            ],
     updatedAt: payload.updatedAt || new Date().toISOString(),
   };
 }

@@ -4,9 +4,11 @@ import {
   LessonFormat,
   StudentEnrollment,
   StudentPayment,
+  StudioPolicyVersion,
   StudioSubscription,
   TimeSlot,
 } from "../types/studio";
+import { FALLBACK_STUDIO_POLICY } from "../content/studioPolicy";
 import {
   PUBLIC_BOOKING_COPY,
   PUBLIC_LESSON_TYPE,
@@ -231,6 +233,31 @@ export async function fetchSubscriptionBySession(
     throw new Error(data.error || "Could not confirm subscription.");
   }
   return data as { subscription: StudioSubscription };
+}
+
+/** Current in-force studio policy from KV (expiresAt null, newest startDate). */
+export async function fetchCurrentStudioPolicy(): Promise<
+  Pick<
+    StudioPolicyVersion,
+    "id" | "title" | "startDate" | "expiresAt" | "sections"
+  > | null
+> {
+  if (!apiBase) return FALLBACK_STUDIO_POLICY;
+  try {
+    const res = await fetch(`${apiBase}/studio/policy`);
+    if (!res.ok) return FALLBACK_STUDIO_POLICY;
+    const data = await res.json();
+    if (!data?.sections?.length) return FALLBACK_STUDIO_POLICY;
+    return {
+      id: String(data.id || FALLBACK_STUDIO_POLICY.id),
+      title: String(data.title || FALLBACK_STUDIO_POLICY.title),
+      startDate: String(data.startDate || FALLBACK_STUDIO_POLICY.startDate),
+      expiresAt: data.expiresAt ? String(data.expiresAt) : null,
+      sections: data.sections,
+    };
+  } catch {
+    return FALLBACK_STUDIO_POLICY;
+  }
 }
 
 export async function startSubscriptionCheckout(input: {

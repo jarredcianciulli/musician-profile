@@ -42,6 +42,12 @@ import {
   SUBSCRIPTION_DURATIONS,
   type SubscriptionDuration,
 } from "../lib/bookingPolicy";
+import {
+  FALLBACK_STUDIO_POLICY,
+  formatPolicyEffectiveDate,
+  selectCurrentPolicy,
+  STUDIO_POLICY_TITLE,
+} from "../content/studioPolicy";
 
 const DAY_LABELS: { day: Weekday; label: string }[] = [
   { day: 0, label: "Sunday" },
@@ -94,6 +100,10 @@ const Admin: React.FC = () => {
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [flyerCode, setFlyerCode] = useState("");
   const [flyerLabel, setFlyerLabel] = useState("");
+  const [policyStartDate, setPolicyStartDate] = useState(
+    () => new Date().toISOString().slice(0, 10)
+  );
+  const [policyPublishing, setPolicyPublishing] = useState(false);
 
   const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
@@ -324,6 +334,50 @@ const Admin: React.FC = () => {
       setStatus(`Lead marked ${status}.`);
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Could not update lead.");
+    }
+  };
+
+  const publishPolicyVersion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payload) return;
+    const startDate = policyStartDate.trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+      setStatus("Policy start date must be YYYY-MM-DD.");
+      return;
+    }
+    setPolicyPublishing(true);
+    try {
+      const current = selectCurrentPolicy(payload.policies || []);
+      const sections =
+        current?.sections?.length
+          ? current.sections
+          : FALLBACK_STUDIO_POLICY.sections;
+      const expiredPrior = (payload.policies || []).map((p) =>
+        !p.expiresAt ? { ...p, expiresAt: startDate } : p
+      );
+      await persist({
+        ...payload,
+        policies: [
+          ...expiredPrior,
+          {
+            id: newId("policy"),
+            title: STUDIO_POLICY_TITLE,
+            startDate,
+            expiresAt: null,
+            sections,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      });
+      setStatus(
+        `Published policy effective ${formatPolicyEffectiveDate(startDate)}. Prior open versions expired.`
+      );
+    } catch (err) {
+      setStatus(
+        err instanceof Error ? err.message : "Could not publish policy."
+      );
+    } finally {
+      setPolicyPublishing(false);
     }
   };
 
@@ -1562,6 +1616,71 @@ const Admin: React.FC = () => {
             </label>
             <button type="submit" className="btn-primary">
               Add flyer
+            </button>
+          </form>
+
+          <h2 className="font-display text-2xl mb-2 mt-12">Studio policy</h2>
+          <p className="text-sm text-muted mb-4">
+            Versions live in the studio store.{" "}
+            <code className="text-xs">expiresAt</code> null means in force; if
+            more than one is open, the newest{" "}
+            <code className="text-xs">startDate</code> is shown. Publishing
+            clones the current sections and expires prior open versions.
+          </p>
+          <ul className="space-y-2 mb-6 text-sm">
+            {[...(payload.policies || [])]
+              .sort((a, b) => b.startDate.localeCompare(a.startDate))
+              .map((p) => {
+                const current = selectCurrentPolicy(payload.policies || []);
+                const isCurrent = current?.id === p.id;
+                return (
+                  <li
+                    key={p.id}
+                    className={`border border-line px-4 py-3 bg-white ${
+                      isCurrent ? "ring-1 ring-sky-deep/30" : ""
+                    }`}
+                  >
+                    <p className="font-medium">
+                      {formatPolicyEffectiveDate(p.startDate)}
+                      {isCurrent ? (
+                        <span className="ml-2 text-xs uppercase tracking-wider text-sky-deep">
+                          Current
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="text-xs text-muted mt-0.5">
+                      start {p.startDate}
+                      {" · "}
+                      expires {p.expiresAt || "— (in place)"}
+                      {" · "}
+                      {p.sections?.length || 0} sections
+                    </p>
+                  </li>
+                );
+              })}
+          </ul>
+          <form
+            onSubmit={publishPolicyVersion}
+            className="bg-white border border-line p-5 flex flex-col sm:flex-row gap-3 items-end max-w-xl"
+          >
+            <label className="text-sm flex-1 w-full">
+              <span className="text-muted text-xs uppercase tracking-wider">
+                New effective date
+              </span>
+              <input
+                type="date"
+                className="admin-input mt-1"
+                value={policyStartDate}
+                onChange={(e) => setPolicyStartDate(e.target.value)}
+                required
+              />
+            </label>
+            <button
+              type="submit"
+              className="btn-primary shrink-0"
+              disabled={policyPublishing}
+            >
+              {policyPublishing ? "Publishing…" : "Publish new version"}
             </button>
           </form>
         </section>

@@ -87,7 +87,7 @@ const Footer: React.FC = () => {
                   href="/account"
                   className="hover:text-gold transition-colors"
                 >
-                  Student account
+                  Account
                 </a>
               </li>
               <li>

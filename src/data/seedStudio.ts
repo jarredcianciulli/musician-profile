@@ -1,3 +1,4 @@
+import { FALLBACK_STUDIO_POLICY } from "../content/studioPolicy";
 import { AvailabilityConfig, StudioPayload } from "../types/studio";
 
 /** Default teaching hours — Charleston (America/New_York). Editable in /admin. */
@@ -79,6 +80,16 @@ export const seedStudio: StudioPayload = {
         "Students share the stage for our year-end recital. Details and call times will be shared with families.",
       visibility: "public",
       syncToGoogle: true,
+    },
+  ],
+  policies: [
+    {
+      id: "policy-2026-10-01",
+      title: FALLBACK_STUDIO_POLICY.title,
+      startDate: "2026-10-01",
+      expiresAt: null,
+      sections: FALLBACK_STUDIO_POLICY.sections,
+      createdAt: "2026-10-01T00:00:00.000Z",
     },
   ],
 };

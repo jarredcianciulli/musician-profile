@@ -12,7 +12,7 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
           <BowStringMark className="w-6 h-10 text-sky-deep shrink-0" />
           <div className="min-w-0">
             <p className="text-[10px] uppercase tracking-[0.16em] text-muted">
-              Student account
+              Account
             </p>
             <p className="font-account text-lg leading-tight truncate font-semibold tracking-tight">
               Battery String Studio
