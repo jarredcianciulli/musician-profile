@@ -37,7 +37,8 @@ function isHomePath(pathname: string | null): boolean {
 export function PublicShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [showIntro, setShowIntro] = useState(false);
-  const [ready, setReady] = useState(false);
+  // Non-home pages skip intro — start interactive (avoids dead nav until effect)
+  const [ready, setReady] = useState(() => !isHomePath(pathname));
 
   useEffect(() => {
     // Policy, lead, SEO pages, etc. — go straight to content

@@ -1,17 +1,25 @@
 "use client";
 
 import React from "react";
+import { usePathname } from "next/navigation";
 import { contactInfo } from "../config/contactInfo";
 import { brand } from "../config/brand";
 import { analytics } from "../utils/analytics";
 import LogoLockup from "./brand/LogoLockup";
 
 const Footer: React.FC = () => {
-  const handleSmoothScroll = (
+  const pathname = usePathname();
+  const onHome = pathname === "/";
+
+  const handleSectionNav = (
     e: React.MouseEvent<HTMLAnchorElement>,
     targetId: string
   ) => {
     e.preventDefault();
+    if (!onHome) {
+      window.location.assign(`/#${targetId}`);
+      return;
+    }
     const element = document.getElementById(targetId);
     if (element) {
       element.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -76,12 +84,20 @@ const Footer: React.FC = () => {
                   <a
                     href={`/#${id}`}
                     className="hover:text-gold transition-colors cursor-pointer inline-block"
-                    onClick={(e) => handleSmoothScroll(e, id)}
+                    onClick={(e) => handleSectionNav(e, id)}
                   >
                     {label}
                   </a>
                 </li>
               ))}
+              <li>
+                <a
+                  href="/policy"
+                  className="hover:text-gold transition-colors"
+                >
+                  Studio policy
+                </a>
+              </li>
               <li>
                 <a
                   href="/account"
@@ -108,7 +124,7 @@ const Footer: React.FC = () => {
                 <a
                   href="/#contact"
                   className="hover:text-gold transition-colors"
-                  onClick={(e) => handleSmoothScroll(e, "contact")}
+                  onClick={(e) => handleSectionNav(e, "contact")}
                 >
                   Message form
                 </a>

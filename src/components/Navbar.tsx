@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { analytics } from "../utils/analytics";
 import { PUBLIC_BOOKING_COPY } from "../lib/bookingPolicy";
 import LogoLockup from "./brand/LogoLockup";
@@ -20,6 +21,8 @@ type Props = {
 };
 
 const Navbar: React.FC<Props> = ({ visible = true }) => {
+  const pathname = usePathname();
+  const onHome = pathname === "/";
   const { openBooking } = useBooking();
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -35,23 +38,28 @@ const Navbar: React.FC<Props> = ({ visible = true }) => {
     openBooking(source);
   };
 
-  const handleSmoothScroll = (
+  const handleNavClick = (
     e: React.MouseEvent<HTMLAnchorElement>,
     targetId: string
   ) => {
     e.preventDefault();
     analytics.navLinkClicked(targetId);
+    setIsOpen(false);
+    if (!onHome) {
+      // Full load so the browser honors the hash (App Router often won't)
+      window.location.assign(`/#${targetId}`);
+      return;
+    }
     const element = document.getElementById(targetId);
     if (element) {
       element.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-    setIsOpen(false);
   };
 
   return (
     <nav
       className={`fixed w-full top-0 z-50 transition-[background-color,border-color,box-shadow,opacity] duration-300 ${
-        isOpen || isScrolled
+        isOpen || isScrolled || !onHome
           ? "bg-paper border-b border-line shadow-sm"
           : "bg-transparent"
       }`}
@@ -63,8 +71,10 @@ const Navbar: React.FC<Props> = ({ visible = true }) => {
       <div className="section-container">
         <div className="flex items-center justify-between h-16">
           <a
-            href="#home"
-            onClick={(e) => handleSmoothScroll(e as any, "home")}
+            href={onHome ? "#home" : "/"}
+            onClick={(e) => {
+              if (onHome) handleNavClick(e, "home");
+            }}
             className="min-w-0"
           >
             <LogoLockup
@@ -79,9 +89,9 @@ const Navbar: React.FC<Props> = ({ visible = true }) => {
             {navLinks.map((link) => (
               <a
                 key={link.id}
-                href={`#${link.id}`}
+                href={onHome ? `#${link.id}` : `/#${link.id}`}
                 className="text-ink-soft/90 hover:text-ink transition-colors cursor-pointer text-sm"
-                onClick={(e) => handleSmoothScroll(e as any, link.id)}
+                onClick={(e) => handleNavClick(e, link.id)}
               >
                 {link.label}
               </a>
@@ -121,9 +131,9 @@ const Navbar: React.FC<Props> = ({ visible = true }) => {
               {navLinks.map((link) => (
                 <a
                   key={link.id}
-                  href={`#${link.id}`}
+                  href={onHome ? `#${link.id}` : `/#${link.id}`}
                   className="text-ink hover:text-sky-deep transition-colors py-2 cursor-pointer"
-                  onClick={(e) => handleSmoothScroll(e as any, link.id)}
+                  onClick={(e) => handleNavClick(e, link.id)}
                 >
                   {link.label}
                 </a>
