@@ -222,7 +222,11 @@ export function buildBillingItems(enrollment, payments = [], monthsAhead = 12) {
       if ((enrollment.amountDueCents || 0) > 0) {
         status = "due";
         amountCents = enrollment.amountDueCents;
-        label = paidThrough ? "Monthly tuition" : "This period (proration)";
+        label = paidThrough
+          ? "Monthly tuition"
+          : enrollment.amountDueLocked
+            ? "First period (custom amount)"
+            : "First period (proration)";
       } else if (paidThrough === currentKey) {
         status = "paid";
       } else if (enrollment.billingMode === "auto" && enrollment.stripeSubscriptionId) {
@@ -275,6 +279,7 @@ export function publicEnrollment(enrollment) {
     status: enrollment.status,
     billingMode,
     amountDueCents: enrollment.amountDueCents || 0,
+    amountDueLocked: Boolean(enrollment.amountDueLocked),
     periodKey: enrollment.periodKey || null,
     paidThroughPeriodKey: enrollment.paidThroughPeriodKey || null,
     nextDueAt: enrollment.nextDueAt || null,
@@ -285,6 +290,39 @@ export function publicEnrollment(enrollment) {
     scheduleMonths: enrollment.scheduleMonths || 12,
     policyAcceptedAt: enrollment.policyAcceptedAt || "",
   };
+}
+
+/** First-period proration summary for the portal (safe public fields). */
+export function publicProrationSummary(enrollment, weeklyHours) {
+  if (!enrollment || enrollment.paidThroughPeriodKey) return null;
+  if ((enrollment.amountDueCents || 0) <= 0 && !enrollment.amountDueLocked) {
+    return null;
+  }
+  const weekday =
+    typeof enrollment.weekday === "number"
+      ? enrollment.weekday
+      : weekdayFromDate(enrollment.slotStart, TIME_ZONE);
+  if (weekday == null || !enrollment.slotStart) return null;
+  try {
+    const proration = computeProration({
+      durationMinutes: enrollment.durationMinutes,
+      preferredWeekday: weekday,
+      startDate: new Date(enrollment.slotStart),
+      weeklyHours,
+      includeToday: true,
+    });
+    return {
+      firstLessonStart: enrollment.slotStart,
+      remainingLessons: proration.remainingLessons,
+      perLessonCents: proration.perLessonCents,
+      calculatedCents: proration.prorateCents,
+      chargedCents: enrollment.amountDueCents || 0,
+      nextCycleStartIso: proration.nextCycleStartIso,
+      customAmount: Boolean(enrollment.amountDueLocked),
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Payment rows for the portal — strip Stripe session / customer ids. */
@@ -337,21 +375,29 @@ export function refreshEnrollmentDue(enrollment, weeklyHours) {
     return next;
   }
 
-  // Never paid: proration from now
+  // Never paid: proration from the enrolled first lesson (not "now"),
+  // so mid-month starts keep every remaining lesson in that month.
   try {
+    const firstLesson = next.slotStart ? new Date(next.slotStart) : now;
     const proration = computeProration({
       durationMinutes: next.durationMinutes,
       preferredWeekday: weekday,
-      startDate: now,
+      startDate: firstLesson,
       weeklyHours,
       includeToday: true,
     });
-    next.amountDueCents = proration.prorateCents || proration.perLessonCents;
     next.periodKey = periodKey;
     next.nextDueAt = null;
     next._proration = proration;
+    if (next.amountDueLocked && typeof next.amountDueCents === "number") {
+      // Admin-set custom first-period amount
+    } else {
+      next.amountDueCents = proration.prorateCents || proration.perLessonCents;
+    }
   } catch {
-    next.amountDueCents = next.amountDueCents || 0;
+    if (!next.amountDueLocked) {
+      next.amountDueCents = next.amountDueCents || 0;
+    }
     next.periodKey = periodKey;
   }
   return next;

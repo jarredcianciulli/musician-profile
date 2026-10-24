@@ -15,6 +15,7 @@ import {
   issueMagicLink,
   issueSession,
   publicEnrollment,
+  publicProrationSummary,
   refreshEnrollmentDue,
   sha256Hex,
   buildSchedule,
@@ -59,6 +60,10 @@ function portalPayload(enrollment, payload) {
     schedule,
     billingItems: buildBillingItems(enrollment, payments, months),
     payments: publicPayments(payments),
+    proration: publicProrationSummary(
+      enrollment,
+      payload.availability?.weeklyHours
+    ),
   };
 }
 
@@ -233,6 +238,76 @@ export async function handleStudentRoutes({
         summary: emailWarning
           ? `Enrollment saved for ${email}, but email failed (${emailWarning}). Copy the magic link below.`
           : `Invite sent to ${email} (${enrollment.billingMode}). Amount due now: ${dueLabel}.`,
+      },
+      200,
+      origin
+    );
+  }
+
+  if (request.method === "POST" && route === "/studio/students/set-amount-due") {
+    if (!adminOk()) return json({ error: "Unauthorized" }, 401, origin);
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ error: "Invalid JSON" }, 400, origin);
+    }
+    const enrollmentId = String(body?.enrollmentId || "").trim();
+    const dollars = Number(body?.amountDollars);
+    const clear = body?.clear === true;
+    if (!enrollmentId) {
+      return json({ error: "enrollmentId required." }, 400, origin);
+    }
+    let payload = await readPayload(env);
+    let enrollment = (payload.enrollments || []).find(
+      (e) => e.id === enrollmentId
+    );
+    if (!enrollment) return json({ error: "Enrollment not found" }, 404, origin);
+
+    if (clear) {
+      enrollment = {
+        ...enrollment,
+        amountDueLocked: false,
+        updatedAt: new Date().toISOString(),
+      };
+      enrollment = refreshEnrollmentDue(
+        enrollment,
+        payload.availability?.weeklyHours
+      );
+      delete enrollment._proration;
+    } else {
+      if (!Number.isFinite(dollars) || dollars < 0 || dollars > 5000) {
+        return json(
+          { error: "amountDollars must be between 0 and 5000." },
+          400,
+          origin
+        );
+      }
+      const cents = Math.round(dollars * 100);
+      enrollment = {
+        ...enrollment,
+        amountDueCents: cents,
+        amountDueLocked: true,
+        updatedAt: new Date().toISOString(),
+      };
+      enrollment = refreshEnrollmentDue(
+        enrollment,
+        payload.availability?.weeklyHours
+      );
+      // refresh keeps locked amount; drop internal proration blob
+      delete enrollment._proration;
+    }
+
+    payload = updateEnrollment(payload, enrollment);
+    await writePayload(env, payload);
+    return json(
+      {
+        ok: true,
+        enrollment: publicEnrollment(enrollment),
+        proration: publicProrationSummary(
+          enrollment,
+          payload.availability?.weeklyHours
+        ),
       },
       200,
       origin
@@ -432,17 +507,24 @@ export async function handleStudentRoutes({
           computeProration({
             durationMinutes: mins,
             preferredWeekday: weekday,
-            startDate: new Date(),
+            startDate: enrollment.slotStart
+              ? new Date(enrollment.slotStart)
+              : new Date(),
             weeklyHours: payload.availability?.weeklyHours,
             includeToday: true,
           });
+        const prorateCents =
+          enrollment.amountDueLocked &&
+          typeof enrollment.amountDueCents === "number"
+            ? enrollment.amountDueCents
+            : proration.prorateCents;
 
         const session = await createSubscriptionCheckoutSession(env, {
           email: enrollment.email,
           name: enrollment.name,
           durationMinutes: mins,
           monthlyRateCents: proration.monthlyRateCents,
-          prorateCents: proration.prorateCents,
+          prorateCents,
           priceId: priceId || undefined,
           successUrl,
           cancelUrl,

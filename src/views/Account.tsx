@@ -346,7 +346,7 @@ const Account: React.FC = () => {
     );
   }
 
-  const { enrollment, billingItems, payments } = data;
+  const { enrollment, billingItems, payments, proration } = data;
   const due = enrollment.amountDueCents || 0;
   const mode = enrollment.billingMode || "manual";
   const autoReady = mode === "auto" && Boolean(enrollment.hasAutoBilling);
@@ -853,27 +853,70 @@ const Account: React.FC = () => {
                       : ""}
                   </p>
                 </div>
-              ) : showAutoSetup ? (
-                <div className="border border-line bg-white px-4 py-4 text-sm space-y-3 mb-4">
-                  <p className="font-medium">Set up monthly auto-charge</p>
-                  <p className="text-ink-soft">
-                    First period: {formatMoney(due)} (proration if mid-month),
-                    then monthly tuition on your card.
-                  </p>
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    disabled={Boolean(checkoutBusy) || !canCheckout}
-                    onClick={() => onCheckout("auto")}
-                  >
-                    {checkoutBusy === "auto"
-                      ? "Redirecting…"
-                      : "Continue to Stripe"}
-                  </button>
-                </div>
               ) : (
                 <div className="border border-line bg-white px-4 py-4 text-sm space-y-3 mb-4">
-                  {showChoice ? (
+                  {proration && due > 0 ? (
+                    <div className="space-y-1">
+                      <p className="font-medium">First period</p>
+                      <p className="text-ink-soft leading-relaxed">
+                        Starting{" "}
+                        {formatSlotDay(proration.firstLessonStart, TZ)} through
+                        end of month
+                        {proration.remainingLessons > 0 ? (
+                          <>
+                            : {proration.remainingLessons} lesson
+                            {proration.remainingLessons === 1 ? "" : "s"}
+                            {!proration.customAmount ? (
+                              <>
+                                {" "}
+                                × {formatMoney(proration.perLessonCents)} ={" "}
+                                <strong>{formatMoney(due)}</strong>
+                              </>
+                            ) : (
+                              <>
+                                {" "}
+                                · amount due{" "}
+                                <strong>{formatMoney(due)}</strong>
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            : <strong>{formatMoney(due)}</strong>
+                          </>
+                        )}
+                      </p>
+                      {proration.nextCycleStartIso ? (
+                        <p className="text-xs text-muted">
+                          Regular monthly tuition begins{" "}
+                          {formatSlotDay(proration.nextCycleStartIso, TZ)}.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : showAutoSetup ? (
+                    <p className="font-medium">Set up monthly auto-charge</p>
+                  ) : null}
+
+                  {showAutoSetup ? (
+                    <>
+                      {!proration ? (
+                        <p className="text-ink-soft">
+                          First period: {formatMoney(due)}, then monthly tuition
+                          on your card.
+                        </p>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        disabled={Boolean(checkoutBusy) || !canCheckout}
+                        onClick={() => onCheckout("auto")}
+                      >
+                        {checkoutBusy === "auto"
+                          ? "Redirecting…"
+                          : "Continue to Stripe"}
+                      </button>
+                    </>
+                  ) : showChoice ? (
                     <div className="grid gap-3 sm:grid-cols-2">
                       <button
                         type="button"

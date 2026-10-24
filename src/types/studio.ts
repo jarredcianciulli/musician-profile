@@ -160,6 +160,8 @@ export type StudentEnrollment = {
   status: "invited" | "active" | string;
   billingMode: StudentBillingMode | string;
   amountDueCents: number;
+  /** When true, amountDueCents is an admin override (not auto-recalculated). */
+  amountDueLocked?: boolean;
   periodKey?: string | null;
   paidThroughPeriodKey?: string | null;
   nextDueAt?: string | null;

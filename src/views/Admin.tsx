@@ -34,6 +34,7 @@ import {
   fetchSubscriptionSlots,
   inviteStudent,
   resendStudentMagicLink,
+  setStudentAmountDue,
   updateLeadStatus,
   type StudentInviteResult,
 } from "../lib/bookingApi";
@@ -128,6 +129,8 @@ const Admin: React.FC = () => {
   );
   const [inviteError, setInviteError] = useState("");
   const [resendBusyId, setResendBusyId] = useState("");
+  const [dueDrafts, setDueDrafts] = useState<Record<string, string>>({});
+  const [dueBusyId, setDueBusyId] = useState("");
   const [pendingMagicUrls, setPendingMagicUrls] = useState<
     Record<string, string>
   >({});
@@ -283,6 +286,55 @@ const Admin: React.FC = () => {
       setStatus("Copied to clipboard.");
     } catch {
       setStatus("Could not copy — select the URL manually.");
+    }
+  };
+
+  const saveAmountDue = async (enrollmentId: string, clear = false) => {
+    const token = getAdminToken();
+    if (!token) {
+      setStatus("Re-login required.");
+      return;
+    }
+    if (!clear) {
+      const dollars = Number(dueDrafts[enrollmentId]);
+      if (!Number.isFinite(dollars) || dollars < 0) {
+        setStatus("Enter a valid dollar amount (e.g. 110).");
+        return;
+      }
+    }
+    setDueBusyId(enrollmentId);
+    try {
+      const enr = (payload?.enrollments || []).find((e) => e.id === enrollmentId);
+      const result = clear
+        ? await setStudentAmountDue(enrollmentId, { clear: true }, token)
+        : await setStudentAmountDue(
+            enrollmentId,
+            {
+              amountDollars: Number(
+                dueDrafts[enrollmentId] ??
+                  String((enr?.amountDueCents || 0) / 100)
+              ),
+            },
+            token
+          );
+      const refreshed = await loadStudio({ includePrivate: true });
+      setPayload(refreshed);
+      const cents = result.enrollment.amountDueCents || 0;
+      setDueDrafts((prev) => ({
+        ...prev,
+        [enrollmentId]: (cents / 100).toFixed(cents % 100 === 0 ? 0 : 2),
+      }));
+      setStatus(
+        clear
+          ? "Amount due reset to calculated proration."
+          : `Amount due set to $${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}.`
+      );
+    } catch (err) {
+      setStatus(
+        err instanceof Error ? err.message : "Could not update amount due."
+      );
+    } finally {
+      setDueBusyId("");
     }
   };
 
@@ -1082,6 +1134,62 @@ const Admin: React.FC = () => {
                               ? "Resend new link"
                               : "Generate / resend link"}
                         </button>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-wider text-muted mb-1">
+                          First-period amount due (proration)
+                          {enr.amountDueLocked ? " · custom" : ""}
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                          <div className="relative flex-1">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-xs">
+                              $
+                            </span>
+                            <input
+                              className="admin-input w-full text-sm pl-7"
+                              inputMode="decimal"
+                              placeholder="110"
+                              value={
+                                dueDrafts[enr.id] ??
+                                (typeof enr.amountDueCents === "number"
+                                  ? String(
+                                      enr.amountDueCents % 100 === 0
+                                        ? enr.amountDueCents / 100
+                                        : (enr.amountDueCents / 100).toFixed(2)
+                                    )
+                                  : "")
+                              }
+                              onChange={(e) =>
+                                setDueDrafts((prev) => ({
+                                  ...prev,
+                                  [enr.id]: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            className="btn-primary shrink-0 text-xs"
+                            disabled={dueBusyId === enr.id}
+                            onClick={() => saveAmountDue(enr.id, false)}
+                          >
+                            {dueBusyId === enr.id ? "Saving…" : "Set amount"}
+                          </button>
+                          {enr.amountDueLocked ? (
+                            <button
+                              type="button"
+                              className="btn-secondary shrink-0 text-xs"
+                              disabled={dueBusyId === enr.id}
+                              onClick={() => saveAmountDue(enr.id, true)}
+                            >
+                              Reset calc
+                            </button>
+                          ) : null}
+                        </div>
+                        <p className="text-xs text-muted mt-1">
+                          Calculated from first lesson date × per-lesson rate.
+                          Override when you quoted a custom total (e.g. $110).
+                        </p>
                       </div>
                       {pendingMagicUrls[enr.id] ? (
                         <div>

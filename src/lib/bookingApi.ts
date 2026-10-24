@@ -341,12 +341,23 @@ export type AccountBillingItem = {
   paidAt?: string | null;
 };
 
+export type AccountProrationSummary = {
+  firstLessonStart: string;
+  remainingLessons: number;
+  perLessonCents: number;
+  calculatedCents: number;
+  chargedCents: number;
+  nextCycleStartIso: string;
+  customAmount?: boolean;
+};
+
 export type AccountPortalData = {
   sessionToken?: string;
   enrollment: StudentEnrollment;
   schedule: AccountScheduleRow[];
   billingItems?: AccountBillingItem[];
   payments: StudentPayment[];
+  proration?: AccountProrationSummary | null;
 };
 
 export async function exchangeAccountMagicToken(
@@ -487,6 +498,28 @@ export async function resendStudentMagicLink(
     throw new Error(data.error || "Could not resend link.");
   }
   return data as { ok: boolean; magicUrl: string };
+}
+
+/** Admin: set or clear custom first-period amount due (dollars). */
+export async function setStudentAmountDue(
+  enrollmentId: string,
+  opts: { amountDollars: number } | { clear: true },
+  adminToken: string
+): Promise<{ ok: boolean; enrollment: StudentEnrollment }> {
+  if (!apiBase) throw new Error("Requires the studio API.");
+  const res = await fetch(`${apiBase}/studio/students/set-amount-due`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${adminToken}`,
+    },
+    body: JSON.stringify({ enrollmentId, ...opts }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "Could not update amount due.");
+  }
+  return data as { ok: boolean; enrollment: StudentEnrollment };
 }
 
 /** Admin-authenticated Checkout / Payment Link for a student. */
