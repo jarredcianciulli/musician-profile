@@ -295,14 +295,28 @@ export async function handleStudentRoutes({
     const magicUrl = accountPath(env, `?token=${issued.token}`);
     let emailWarning = "";
     try {
-      await sendStudentInviteEmail(env, {
-        name,
-        email,
-        magicUrl,
-        billingMode: enrollment.billingMode,
-      });
+      const sent = await sendStudentInviteEmail(
+        env,
+        {
+          name,
+          email,
+          magicUrl,
+          billingMode: enrollment.billingMode,
+          enrollmentId: enrollment.id,
+        },
+        payload
+      );
+      if (sent.payload) {
+        payload = sent.payload;
+        await writePayload(env, payload);
+      }
     } catch (err) {
       // Enrollment + link are already saved — return them so Admin can copy.
+      // Failed/skipped sends still write a log row when payload was passed.
+      if (err && err.payload) {
+        payload = err.payload;
+        await writePayload(env, payload);
+      }
       emailWarning =
         err instanceof Error ? err.message : "Invite email failed";
       console.error("Invite email failed:", emailWarning);
@@ -423,13 +437,26 @@ export async function handleStudentRoutes({
 
     const magicUrl = accountPath(env, `?token=${issued.token}`);
     try {
-      await sendStudentInviteEmail(env, {
-        name: enrollment.name,
-        email: enrollment.email,
-        magicUrl,
-        billingMode: enrollment.billingMode || "manual",
-      });
+      const sent = await sendStudentInviteEmail(
+        env,
+        {
+          name: enrollment.name,
+          email: enrollment.email,
+          magicUrl,
+          billingMode: enrollment.billingMode || "manual",
+          enrollmentId: enrollment.id,
+        },
+        payload
+      );
+      if (sent.payload) {
+        payload = sent.payload;
+        await writePayload(env, payload);
+      }
     } catch (err) {
+      if (err && err.payload) {
+        payload = err.payload;
+        await writePayload(env, payload);
+      }
       return json(
         {
           error: err instanceof Error ? err.message : "Resend failed",
@@ -707,13 +734,29 @@ export async function handleStudentRoutes({
     await writePayload(env, payload);
     const magicUrl = accountPath(env, `?token=${issued.token}`);
     try {
-      await sendStudentInviteEmail(env, {
-        name: enrollment.name,
-        email: enrollment.email,
-        magicUrl,
-        billingMode: enrollment.billingMode || "manual",
-      });
+      const sent = await sendStudentInviteEmail(
+        env,
+        {
+          name: enrollment.name,
+          email: enrollment.email,
+          magicUrl,
+          billingMode: enrollment.billingMode || "manual",
+          enrollmentId: enrollment.id,
+        },
+        payload
+      );
+      if (sent.payload) {
+        payload = sent.payload;
+        await writePayload(env, payload);
+      }
     } catch (err) {
+      if (err && err.payload) {
+        try {
+          await writePayload(env, err.payload);
+        } catch {
+          /* ignore */
+        }
+      }
       console.error("request-link email failed:", err);
     }
     return okResponse;

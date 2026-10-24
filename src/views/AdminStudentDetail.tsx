@@ -4,6 +4,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import BowStringMark from "../components/brand/BowStringMark";
+import { ConfirmModal } from "../components/ConfirmModal";
+import { useConfirmModal } from "../hooks/useConfirmModal";
+import { emailTemplateById } from "../content/emailTemplates";
 import {
   clearAdminToken,
   getAdminToken,
@@ -20,18 +23,20 @@ import {
 import type {
   HolidayWeek,
   StudentEnrollment,
+  StudioEmailLog,
   StudioPayload,
   StudioSubscription,
 } from "../types/studio";
 
 const TZ = "America/New_York";
 
-type NavId = "account" | "subscription" | "custom";
+type NavId = "account" | "subscription" | "custom" | "emails";
 
 const NAV: { id: NavId; label: string }[] = [
   { id: "account", label: "Account" },
   { id: "subscription", label: "Subscription" },
   { id: "custom", label: "Custom info" },
+  { id: "emails", label: "Emails" },
 ];
 
 function isPendingInvite(e: StudentEnrollment) {
@@ -45,6 +50,7 @@ function isPendingInvite(e: StudentEnrollment) {
 const AdminStudentDetail: React.FC = () => {
   const params = useParams();
   const router = useRouter();
+  const { confirm, confirmProps } = useConfirmModal();
   const id = String(params?.id || "");
   const [payload, setPayload] = useState<StudioPayload | null>(null);
   const [error, setError] = useState("");
@@ -101,30 +107,50 @@ const AdminStudentDetail: React.FC = () => {
     router.push(`/admin/students/${id}/edit`);
   };
 
+  const studentEmails: StudioEmailLog[] = useMemo(() => {
+    if (!enrollment || !payload) return [];
+    const email = (enrollment.email || "").toLowerCase();
+    return (payload.emails || []).filter(
+      (em) =>
+        em.enrollmentId === enrollment.id ||
+        (email && em.to?.toLowerCase() === email)
+    );
+  }, [enrollment, payload]);
+
   const onResend = async () => {
     const token = getAdminToken();
     if (!token || !enrollment) return;
+    const ok = await confirm("resendMagicLink", {
+      name: enrollment.name,
+      email: enrollment.email,
+    });
+    if (!ok) return;
     setBusy("resend");
     setError("");
     try {
       await resendStudentMagicLink(enrollment.id, token);
+      const refreshed = await loadStudio({ includePrivate: true });
+      setPayload(refreshed);
       setBusy("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Resend failed.");
       setBusy("");
+      try {
+        setPayload(await loadStudio({ includePrivate: true }));
+      } catch {
+        /* ignore */
+      }
     }
   };
 
   const onCancelInvite = async () => {
     const token = getAdminToken();
     if (!token || !enrollment) return;
-    if (
-      !window.confirm(
-        `Cancel invite for ${enrollment.name}? They will no longer be able to use their magic link.`
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm("cancelInvite", {
+      name: enrollment.name,
+      email: enrollment.email,
+    });
+    if (!ok) return;
     setBusy("cancel");
     setError("");
     try {
@@ -139,13 +165,11 @@ const AdminStudentDetail: React.FC = () => {
   const onOpenAsStudent = async () => {
     const token = getAdminToken();
     if (!token || !enrollment) return;
-    if (
-      !window.confirm(
-        `Open ${enrollment.name}’s student portal? This creates a one-time link (15 min) and notifies Slack.`
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm("openAsStudent", {
+      name: enrollment.name,
+      email: enrollment.email,
+    });
+    if (!ok) return;
     setBusy("impersonate");
     setError("");
     try {
@@ -483,8 +507,64 @@ const AdminStudentDetail: React.FC = () => {
               )}
             </section>
           ) : null}
+
+          {section === "emails" ? (
+            <section className="border border-line bg-white px-5 py-5 space-y-4">
+              <h2 className="font-display text-2xl">Emails</h2>
+              <p className="text-sm text-muted">
+                Messages sent to this student (including invites before they
+                finish signup), with delivery status.
+              </p>
+              {studentEmails.length === 0 ? (
+                <p className="text-sm text-muted">No emails logged yet.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {studentEmails.map((em) => {
+                    const tmpl = emailTemplateById(em.templateId);
+                    return (
+                      <li
+                        key={em.id}
+                        className="border border-line px-3 py-3 text-sm space-y-1"
+                      >
+                        <div className="flex flex-wrap justify-between gap-2">
+                          <p className="font-medium">
+                            {tmpl?.name || em.templateId}
+                          </p>
+                          <span
+                            className={`text-xs uppercase tracking-wider ${
+                              em.status === "sent"
+                                ? "text-sky-deep"
+                                : em.status === "failed"
+                                  ? "text-accent"
+                                  : "text-muted"
+                            }`}
+                          >
+                            {em.status}
+                          </span>
+                        </div>
+                        <p className="text-muted">{em.subject}</p>
+                        <p className="text-xs text-muted">
+                          {em.createdAt
+                            ? new Date(em.createdAt).toLocaleString()
+                            : ""}{" "}
+                          · {em.to}
+                        </p>
+                        {em.error ? (
+                          <p className="text-xs text-accent">{em.error}</p>
+                        ) : null}
+                        {em.preview ? (
+                          <p className="text-xs text-muted">{em.preview}</p>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+          ) : null}
         </div>
       </div>
+      <ConfirmModal {...confirmProps} />
     </div>
   );
 };

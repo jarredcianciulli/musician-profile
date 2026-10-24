@@ -3,6 +3,12 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import BowStringMark from "../components/brand/BowStringMark";
+import { ConfirmModal } from "../components/ConfirmModal";
+import { useConfirmModal } from "../hooks/useConfirmModal";
+import {
+  EMAIL_TEMPLATES,
+  emailTemplateById,
+} from "../content/emailTemplates";
 import { brand } from "../config/brand";
 import {
   clearAdminToken,
@@ -62,13 +68,14 @@ const DAY_LABELS: { day: Weekday; label: string }[] = [
   { day: 6, label: "Saturday" },
 ];
 
-type AdminTab = "students" | "bookings" | "schedule" | "marketing";
+type AdminTab = "students" | "bookings" | "schedule" | "marketing" | "emails";
 
 const ADMIN_TABS: { id: AdminTab; label: string }[] = [
   { id: "students", label: "Students" },
   { id: "bookings", label: "Bookings" },
   { id: "schedule", label: "Schedule" },
   { id: "marketing", label: "Marketing" },
+  { id: "emails", label: "Emails" },
 ];
 
 const emptyHoliday = (): HolidayWeek => ({
@@ -92,6 +99,7 @@ const emptyEvent = (): StudioEvent => ({
 });
 
 const Admin: React.FC = () => {
+  const { confirm, confirmProps } = useConfirmModal();
   const [authed, setAuthed] = useState(Boolean(getAdminToken()));
   const [tokenInput, setTokenInput] = useState("");
   const [authError, setAuthError] = useState("");
@@ -249,6 +257,13 @@ const Admin: React.FC = () => {
       end = slot.end;
     }
 
+    const ok = await confirm("sendInvite", {
+      name: inviteName.trim(),
+      email: inviteEmail.trim(),
+      billingMode: inviteBilling,
+    });
+    if (!ok) return;
+
     setInviteSubmitting(true);
     try {
       const customDue = inviteAmountDollars.trim();
@@ -353,19 +368,18 @@ const Admin: React.FC = () => {
     }
   };
 
-  const cancelInvite = async (enrollmentId: string, name: string) => {
+  const cancelInvite = async (
+    enrollmentId: string,
+    name: string,
+    email?: string
+  ) => {
     const token = getAdminToken();
     if (!token) {
       setStatus("Re-login required.");
       return;
     }
-    if (
-      !window.confirm(
-        `Cancel invite for ${name}? Their magic link will stop working.`
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm("cancelInvite", { name, email });
+    if (!ok) return;
     setCancelBusyId(enrollmentId);
     try {
       await cancelStudentInvite(enrollmentId, token);
@@ -384,12 +398,18 @@ const Admin: React.FC = () => {
     }
   };
 
-  const resendInvite = async (enrollmentId: string) => {
+  const resendInvite = async (
+    enrollmentId: string,
+    name?: string,
+    email?: string
+  ) => {
     const token = getAdminToken();
     if (!token) {
       setStatus("Re-login required.");
       return;
     }
+    const ok = await confirm("resendMagicLink", { name, email });
+    if (!ok) return;
     setResendBusyId(enrollmentId);
     try {
       const result = await resendStudentMagicLink(enrollmentId, token);
@@ -1213,7 +1233,9 @@ const Admin: React.FC = () => {
                             type="button"
                             className="btn-primary text-xs"
                             disabled={resendBusyId === enr.id}
-                            onClick={() => resendInvite(enr.id)}
+                            onClick={() =>
+                              resendInvite(enr.id, enr.name, enr.email)
+                            }
                           >
                             {resendBusyId === enr.id
                               ? "Sending…"
@@ -1225,7 +1247,9 @@ const Admin: React.FC = () => {
                             type="button"
                             className="btn-secondary text-xs text-accent"
                             disabled={cancelBusyId === enr.id}
-                            onClick={() => cancelInvite(enr.id, enr.name)}
+                            onClick={() =>
+                              cancelInvite(enr.id, enr.name, enr.email)
+                            }
                           >
                             {cancelBusyId === enr.id
                               ? "Cancelling…"
@@ -1372,7 +1396,9 @@ const Admin: React.FC = () => {
                           type="button"
                           className="btn-secondary text-xs"
                           disabled={resendBusyId === enr.id}
-                          onClick={() => resendInvite(enr.id)}
+                          onClick={() =>
+                            resendInvite(enr.id, enr.name, enr.email)
+                          }
                         >
                           {resendBusyId === enr.id
                             ? "Sending…"
@@ -1941,6 +1967,116 @@ const Admin: React.FC = () => {
         </section>
         ) : null}
 
+        {adminTab === "emails" ? (
+          <section className="space-y-10">
+            <div>
+              <h2 className="font-display text-2xl mb-2">Email templates</h2>
+              <p className="text-sm text-muted mb-6 max-w-2xl">
+                Reference list of transactional emails the studio can send.
+                Actual sends are logged below and on each student profile.
+              </p>
+              <ul className="space-y-3 max-w-3xl">
+                {EMAIL_TEMPLATES.map((t) => (
+                  <li
+                    key={t.id}
+                    className="bg-white border border-line px-4 py-4 text-sm space-y-2"
+                  >
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <p className="font-medium">{t.name}</p>
+                      <span className="text-xs uppercase tracking-wider text-muted">
+                        {t.audience}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted font-mono">{t.id}</p>
+                    <p className="text-ink-soft">
+                      <span className="text-muted">Subject:</span> {t.subject}
+                    </p>
+                    <p className="text-ink-soft leading-relaxed">
+                      {t.description}
+                    </p>
+                    <ul className="list-disc pl-5 text-muted space-y-0.5">
+                      {t.outline.map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <h2 className="font-display text-2xl mb-2">Sent emails</h2>
+              <p className="text-sm text-muted mb-4">
+                Recent outbound mail (invite, resend, etc.), including failures.
+              </p>
+              {(payload.emails || []).length === 0 ? (
+                <p className="text-sm text-muted bg-white border border-line px-4 py-6">
+                  No emails logged yet. Send or resend an invite to start the
+                  history.
+                </p>
+              ) : (
+                <ul className="space-y-2 max-w-3xl">
+                  {[...(payload.emails || [])]
+                    .slice(0, 80)
+                    .map((em) => {
+                      const tmpl = emailTemplateById(em.templateId);
+                      return (
+                        <li
+                          key={em.id}
+                          className="bg-white border border-line px-4 py-3 text-sm space-y-1"
+                        >
+                          <div className="flex flex-wrap justify-between gap-2">
+                            <p className="font-medium">
+                              {tmpl?.name || em.templateId}
+                            </p>
+                            <span
+                              className={`text-xs uppercase tracking-wider ${
+                                em.status === "sent"
+                                  ? "text-sky-deep"
+                                  : em.status === "failed"
+                                    ? "text-accent"
+                                    : "text-muted"
+                              }`}
+                            >
+                              {em.status}
+                            </span>
+                          </div>
+                          <p className="text-muted">
+                            To {em.toName || em.to} · {em.subject}
+                          </p>
+                          <p className="text-xs text-muted">
+                            {em.createdAt
+                              ? new Date(em.createdAt).toLocaleString()
+                              : ""}
+                            {em.enrollmentId ? (
+                              <>
+                                {" · "}
+                                <Link
+                                  href={`/admin/students/${em.enrollmentId}`}
+                                  className="text-sky-deep hover:underline"
+                                >
+                                  Open student
+                                </Link>
+                              </>
+                            ) : null}
+                          </p>
+                          {em.error ? (
+                            <p className="text-xs text-accent">{em.error}</p>
+                          ) : null}
+                          {em.preview ? (
+                            <p className="text-xs text-muted line-clamp-2">
+                              {em.preview}
+                            </p>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                </ul>
+              )}
+            </div>
+          </section>
+        ) : null}
+
         <p className="text-xs text-muted pb-8">
           Last updated: {payload.updatedAt}
           {" · "}
@@ -1948,6 +2084,7 @@ const Admin: React.FC = () => {
           going live.
         </p>
       </main>
+      <ConfirmModal {...confirmProps} />
     </div>
   );
 };

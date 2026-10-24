@@ -193,6 +193,20 @@ export type StudentPayment = {
   createdAt?: string;
 };
 
+/** Outbound transactional email log (admin-visible). */
+export type StudioEmailLog = {
+  id: string;
+  templateId: string;
+  enrollmentId?: string;
+  to: string;
+  toName?: string;
+  subject: string;
+  status: "sent" | "failed" | "skipped" | string;
+  error?: string;
+  preview?: string;
+  createdAt: string;
+};
+
 export type StudioPolicySection = {
   heading: string;
   body: string;
@@ -220,6 +234,8 @@ export type StudioPayload = {
   reservations?: Array<Record<string, unknown>>;
   enrollments?: StudentEnrollment[];
   payments?: StudentPayment[];
+  /** Outbound email history (invite, resend, etc.) */
+  emails?: StudioEmailLog[];
   flyers?: FlyerCampaign[];
   leads?: StudioLead[];
   /** Versioned studio policies; current = expiresAt null, newest startDate */

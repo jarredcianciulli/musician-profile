@@ -3,6 +3,7 @@ import {
   sendTransactionalEmail,
   studioInbox,
 } from "./brevo.js";
+import { sendAndLogEmail } from "./emailLog.js";
 
 function formatWhen(iso, timezone = "America/New_York") {
   if (!iso) return "—";
@@ -167,10 +168,15 @@ export async function sendSubscriptionBookedEmails(env, sub, reservation) {
   }
 }
 
-/** Magic-link invite to student billing portal. */
+/**
+ * Magic-link invite to student billing portal.
+ * Pass payload + enrollmentId to persist a send log on the studio store.
+ * @returns {{ payload?: object, record?: object }}
+ */
 export async function sendStudentInviteEmail(
   env,
-  { name, email, magicUrl, billingMode = "manual" }
+  { name, email, magicUrl, billingMode = "manual", enrollmentId = "" },
+  payload = null
 ) {
   const inbox = studioInbox(env);
   const isAuto = billingMode === "auto";
@@ -178,11 +184,8 @@ export async function sendStudentInviteEmail(
     ? `<p>Your weekly lesson spot is ready. Open your account to see your schedule and set up <strong>monthly auto-charge</strong>.</p>`
     : `<p>Your weekly lesson spot is ready. Open your account to see your schedule and <strong>pay what’s due</strong> for this period.</p>`;
   const accountSignInUrl = `${siteBase(env)}/account`;
-  const result = await sendTransactionalEmail(env, {
-    to: email,
-    toName: name || email,
-    subject: "Your Battery String Studio account — set up billing",
-    html: wrap(`
+  const subject = "Your Battery String Studio account — set up billing";
+  const html = wrap(`
       <h2 style="font-weight:600">Welcome${name ? `, ${escapeHtml(name)}` : ""}</h2>
       ${billingBlurb}
       <p style="font-size:14px;color:#444;line-height:1.5">You’ll confirm the <a href="${siteBase(env)}/policy">studio policy</a> when you set up billing — it covers tuition, reserved weekly slots, and make-ups.</p>
@@ -190,7 +193,36 @@ export async function sendStudentInviteEmail(
       <p style="font-size:13px;color:#666;margin-top:20px">This sign-in link expires in 48 hours. If it expires, request a new one here:</p>
       <p><a href="${escapeHtml(accountSignInUrl)}" style="display:inline-block;padding:12px 18px;border:1px solid #1b3a5c;color:#1b3a5c;text-decoration:none">Request a new sign-in link</a></p>
       <p style="font-size:13px;color:#666">Or email <a href="mailto:${escapeHtml(inbox)}">${escapeHtml(inbox)}</a> and we&apos;ll resend it.</p>
-    `),
+    `);
+
+  if (payload) {
+    const logged = await sendAndLogEmail(env, payload, {
+      templateId: "student_invite",
+      enrollmentId,
+      to: email,
+      toName: name || email,
+      subject,
+      html,
+      replyTo: { email: inbox, name: "Battery String Studio" },
+    });
+    if (!logged.result.ok) {
+      throw Object.assign(
+        new Error(
+          logged.result.skipped
+            ? "BREVO_API_KEY not set — skipped invite email"
+            : `Invite email failed: ${logged.result.status || ""} ${logged.result.details || ""}`
+        ),
+        { payload: logged.payload, emailRecord: logged.record }
+      );
+    }
+    return { payload: logged.payload, record: logged.record };
+  }
+
+  const result = await sendTransactionalEmail(env, {
+    to: email,
+    toName: name || email,
+    subject,
+    html,
     replyTo: { email: inbox, name: "Battery String Studio" },
   });
   if (!result.ok) {
@@ -200,6 +232,7 @@ export async function sendStudentInviteEmail(
         : `Invite email failed: ${result.status || ""} ${result.details || ""}`
     );
   }
+  return {};
 }
 
 /** Studio alert + optional client auto-reply for /lead form. */

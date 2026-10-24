@@ -82,6 +82,7 @@ const seed = {
   reservations: [],
   enrollments: [],
   payments: [],
+  emails: [],
   leads: [],
   flyers: seedFlyers,
   policies: defaultPolicies(),
@@ -193,6 +194,7 @@ function normalizePayload(raw) {
     reservations,
     enrollments: Array.isArray(raw.enrollments) ? raw.enrollments : [],
     payments: Array.isArray(raw.payments) ? raw.payments : [],
+    emails: Array.isArray(raw.emails) ? raw.emails : [],
     leads: Array.isArray(raw.leads) ? raw.leads : [],
     flyers: Array.isArray(raw.flyers) && raw.flyers.length
       ? raw.flyers
@@ -1030,6 +1032,7 @@ export default {
         payments: Array.isArray(body.payments)
           ? body.payments
           : current.payments,
+        emails: Array.isArray(body.emails) ? body.emails : current.emails,
         leads: Array.isArray(body.leads) ? body.leads : current.leads,
         flyers: Array.isArray(body.flyers) ? body.flyers : current.flyers,
         policies: Array.isArray(body.policies)
