@@ -92,6 +92,14 @@ const Footer: React.FC = () => {
               ))}
               <li>
                 <a
+                  href="/calc"
+                  className="hover:text-gold transition-colors"
+                >
+                  Tuition calculator
+                </a>
+              </li>
+              <li>
+                <a
                   href="/policy"
                   className="hover:text-gold transition-colors"
                 >

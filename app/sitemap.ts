@@ -11,6 +11,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/viola-lessons", priority: 0.85, changeFrequency: "monthly" },
     { path: "/lead", priority: 0.7, changeFrequency: "monthly" },
     { path: "/policy", priority: 0.5, changeFrequency: "yearly" },
+    { path: "/calc", priority: 0.6, changeFrequency: "monthly" },
   ];
   return entries.map(({ path, priority, changeFrequency }) => ({
     url: `${base}${path || "/"}`,
