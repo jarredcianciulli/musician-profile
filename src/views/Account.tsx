@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   clearAccountSessionToken,
-  confirmAccountCheckoutSession,
   exchangeAccountMagicToken,
   fetchAccountMe,
   getAccountSessionToken,
@@ -28,7 +27,6 @@ import { formatSlotDay, formatSlotTime } from "../lib/slots";
 import { marketingSiteUrl, studioEmail } from "../lib/env";
 import { collectReturnQuery } from "../lib/returnQuery";
 import StudioPolicyBody from "../components/StudioPolicyBody";
-import { lockBodyScroll, unlockBodyScroll } from "../lib/scrollLock";
 
 const SCHEDULE_COLLAPSE_KEY = "bss_account_schedule_open";
 
@@ -79,11 +77,7 @@ const Account: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [policyChecked, setPolicyChecked] = useState(false);
-  const [paidModalOpen, setPaidModalOpen] = useState(false);
-  const [confirmingPay, setConfirmingPay] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const paidBanner = searchParams.get("paid") === "1";
-  const checkoutSessionId = searchParams.get("session_id") || "";
   const canceledBanner = searchParams.get("canceled") === "1";
 
   useEffect(() => {
@@ -105,34 +99,7 @@ const Account: React.FC = () => {
   }, [scheduleOpen]);
 
   useEffect(() => {
-    if (paidBanner && data?.enrollment) setPaidModalOpen(true);
-  }, [paidBanner, data?.enrollment]);
-
-  useEffect(() => {
-    if (!paidModalOpen) return;
-    lockBodyScroll();
-    return () => unlockBodyScroll();
-  }, [paidModalOpen]);
-
-  const closePaidModal = () => {
-    setPaidModalOpen(false);
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.delete("paid");
-      url.searchParams.delete("session_id");
-      const qs = url.searchParams.toString();
-      window.history.replaceState(
-        {},
-        "",
-        `${url.pathname}${qs ? `?${qs}` : ""}${url.hash}`
-      );
-    } catch {
-      /* ignore */
-    }
-  };
-
-  useEffect(() => {
-    if (!menuOpen && !paidModalOpen && !infoOpen) return;
+    if (!menuOpen && !infoOpen) return;
     const onDoc = (e: MouseEvent) => {
       if (
         menuOpen &&
@@ -144,23 +111,6 @@ const Account: React.FC = () => {
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (paidModalOpen) {
-        setPaidModalOpen(false);
-        try {
-          const url = new URL(window.location.href);
-          url.searchParams.delete("paid");
-          url.searchParams.delete("session_id");
-          const qs = url.searchParams.toString();
-          window.history.replaceState(
-            {},
-            "",
-            `${url.pathname}${qs ? `?${qs}` : ""}${url.hash}`
-          );
-        } catch {
-          /* ignore */
-        }
-        return;
-      }
       setMenuOpen(false);
       setInfoOpen(false);
     };
@@ -170,7 +120,7 @@ const Account: React.FC = () => {
       document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("keydown", onKey);
     };
-  }, [menuOpen, paidModalOpen, infoOpen]);
+  }, [menuOpen, infoOpen]);
 
   useEffect(() => {
     if (!data?.enrollment?.id || !data.schedule) return;
@@ -278,40 +228,6 @@ const Account: React.FC = () => {
       setError(err instanceof Error ? err.message : "Session expired.");
     }
   };
-
-  useEffect(() => {
-    if (!paidBanner || !getAccountSessionToken()) return;
-    let cancelled = false;
-    (async () => {
-      setConfirmingPay(true);
-      try {
-        if (checkoutSessionId) {
-          const next = await confirmAccountCheckoutSession(checkoutSessionId);
-          if (!cancelled) {
-            setData(next);
-            setError("");
-          }
-        } else {
-          await refresh();
-        }
-      } catch {
-        if (!cancelled) {
-          try {
-            await refresh();
-          } catch {
-            /* keep prior error / state */
-          }
-        }
-      } finally {
-        if (!cancelled) setConfirmingPay(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // refresh is stable enough for this return-from-Stripe path
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paidBanner, checkoutSessionId]);
 
   const onRequestLink = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -549,37 +465,6 @@ const Account: React.FC = () => {
           ) : null}
         </div>
       </div>
-
-      {paidModalOpen ? (
-        <div
-          className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-ink/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="account-paid-title"
-        >
-          <div className="bg-white border border-line w-full max-w-md p-6 sm:p-8 space-y-5 shadow-sm">
-            <h2
-              id="account-paid-title"
-              className="font-display text-3xl leading-tight"
-            >
-              Thank you!
-            </h2>
-            <p className="text-base text-ink/90 leading-relaxed">
-              {enrollment.billingMode === "auto"
-                ? "You’re set up for automatic payments on the 1st of each month. Let’s make some music."
-                : "Your payment was received. Let’s make some music."}
-            </p>
-            <button
-              type="button"
-              className="btn-primary w-full sm:w-auto"
-              onClick={closePaidModal}
-              autoFocus
-            >
-              Continue to account
-            </button>
-          </div>
-        </div>
-      ) : null}
 
       {infoOpen ? (
         <div
@@ -916,16 +801,10 @@ const Account: React.FC = () => {
           const policyDone = Boolean(enrollment.policyAcceptedAt);
           const needsCheckout =
             !autoReady &&
-            !confirmingPay &&
             (showAutoSetup || showChoice || (showManualPay && due > 0));
           const canCheckout = policyDone || policyChecked;
           return (
             <>
-              {confirmingPay ? (
-                <p className="text-sm text-muted mb-4">
-                  Confirming your payment…
-                </p>
-              ) : null}
               {needsCheckout && !policyDone ? (
                 <div className="border border-line bg-white px-4 py-4 text-sm space-y-3 mb-4">
                   <StudioPolicyBody variant="scroll" showTitle />
@@ -964,10 +843,6 @@ const Account: React.FC = () => {
                       ? ` · renews around ${formatSlotDay(enrollment.nextDueAt, TZ)}`
                       : ""}
                   </p>
-                </div>
-              ) : confirmingPay ? (
-                <div className="border border-line bg-white px-4 py-4 text-sm mb-4">
-                  <p className="text-ink-soft">Updating billing…</p>
                 </div>
               ) : (
                 <div className="border border-line bg-white px-4 py-4 text-sm space-y-3 mb-4">

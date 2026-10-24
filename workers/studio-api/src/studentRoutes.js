@@ -43,12 +43,17 @@ function siteBase(env) {
   );
 }
 
-/** Student portal URLs for magic links + Stripe return. */
-function accountPath(env, query = "") {
-  const q = !query ? "" : query.startsWith("?") ? query : `?${query}`;
+/** Student portal URLs for magic links + Stripe return.
+ *  suffix: "?token=…" or "/success?session_id=…"
+ */
+function accountPath(env, suffix = "") {
   const dedicated = (env.ACCOUNT_DOMAIN || "").replace(/\/$/, "");
-  if (dedicated) return `${dedicated}/account${q}`;
-  return `${siteBase(env)}/account${q}`;
+  const base = dedicated || siteBase(env);
+  if (!suffix) return `${base}/account`;
+  if (suffix.startsWith("/") || suffix.startsWith("?")) {
+    return `${base}/account${suffix}`;
+  }
+  return `${base}/account?${suffix}`;
 }
 
 function portalPayload(enrollment, payload) {
@@ -623,7 +628,7 @@ export async function handleStudentRoutes({
     }
 
     const successUrl = appendReturnQuery(
-      accountPath(env, "?paid=1&session_id={CHECKOUT_SESSION_ID}"),
+      accountPath(env, "/success?session_id={CHECKOUT_SESSION_ID}"),
       returnQuery
     );
     const cancelUrl = appendReturnQuery(
