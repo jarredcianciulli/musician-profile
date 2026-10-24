@@ -78,7 +78,15 @@ const Account: React.FC = () => {
   const [infoOpen, setInfoOpen] = useState(false);
   const [policyChecked, setPolicyChecked] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const canceledBanner = searchParams.get("canceled") === "1";
+  useEffect(() => {
+    // Legacy Stripe cancel URL (?canceled=1) → durable route
+    if (searchParams.get("canceled") === "1" && typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.pathname = "/account/canceled";
+      url.searchParams.delete("canceled");
+      window.location.replace(url.pathname + url.search + url.hash);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     try {
@@ -542,11 +550,6 @@ const Account: React.FC = () => {
         </div>
       ) : null}
 
-      {canceledBanner ? (
-        <p className="text-sm text-muted mb-6">
-          Checkout canceled. You can try again anytime.
-        </p>
-      ) : null}
       {error ? (
         <p className="text-sm text-accent mb-4" role="alert">
           {error}

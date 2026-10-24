@@ -407,10 +407,16 @@ export async function fetchAccountMe(): Promise<AccountPortalData> {
   return data as AccountPortalData;
 }
 
+export type AccountCheckoutConfirm = AccountPortalData & {
+  confirmed: boolean;
+  paymentStatus?: string;
+  sessionStatus?: string;
+};
+
 /** Confirm Stripe Checkout on return so Pay / Stripe CTAs hide immediately. */
 export async function confirmAccountCheckoutSession(
   sessionId: string
-): Promise<AccountPortalData> {
+): Promise<AccountCheckoutConfirm> {
   if (!apiBase) throw new Error("Account portal requires the studio API.");
   const token = getAccountSessionToken();
   if (!token) throw new Error("Not signed in.");
@@ -424,7 +430,7 @@ export async function confirmAccountCheckoutSession(
   if (!res.ok) {
     throw new Error(data.error || "Could not confirm payment.");
   }
-  return data as AccountPortalData;
+  return data as AccountCheckoutConfirm;
 }
 
 export async function startAccountCheckout(

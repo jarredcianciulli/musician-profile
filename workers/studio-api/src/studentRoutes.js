@@ -540,16 +540,21 @@ export async function handleStudentRoutes({
     let enrollment = await requireStudentSession(request, payload);
     if (!enrollment) return json({ error: "Unauthorized" }, 401, origin);
 
+    let confirmed = false;
+    let paymentStatus = "";
+    let sessionStatus = "";
     try {
       const session = await retrieveCheckoutSession(env, sessionId);
       const meta = session?.metadata || {};
+      paymentStatus = String(session.payment_status || "");
+      sessionStatus = String(session.status || "");
       if (meta.enrollmentId && meta.enrollmentId !== enrollment.id) {
         return json({ error: "Session does not match this account." }, 403, origin);
       }
       const complete =
-        session.status === "complete" ||
-        session.payment_status === "paid" ||
-        session.payment_status === "no_payment_required";
+        session.status === "complete" &&
+        (session.payment_status === "paid" ||
+          session.payment_status === "no_payment_required");
       if (
         complete &&
         (meta.type === "enrollment_subscription" || meta.type === "manual_due")
@@ -562,11 +567,23 @@ export async function handleStudentRoutes({
         if (result.enrollment) {
           payload = result.payload;
           enrollment = result.enrollment;
+          confirmed = true;
           await writePayload(env, payload);
         }
       }
     } catch (err) {
       console.error("Account checkout-session confirm failed:", err);
+    }
+
+    // Already applied earlier (webhook) — still treat as success for the UI.
+    if (
+      !confirmed &&
+      enrollment.stripeSessionId === sessionId &&
+      ((enrollment.billingMode === "auto" && enrollment.stripeSubscriptionId) ||
+        ((enrollment.amountDueCents || 0) <= 0 &&
+          enrollment.paidThroughPeriodKey))
+    ) {
+      confirmed = true;
     }
 
     enrollment = refreshEnrollmentDue(
@@ -576,7 +593,16 @@ export async function handleStudentRoutes({
     delete enrollment._proration;
     payload = updateEnrollment(payload, enrollment);
     await writePayload(env, payload);
-    return json(portalPayload(enrollment, payload), 200, origin);
+    return json(
+      {
+        confirmed,
+        paymentStatus,
+        sessionStatus,
+        ...portalPayload(enrollment, payload),
+      },
+      200,
+      origin
+    );
   }
 
   if (request.method === "POST" && route === "/studio/account/checkout") {
@@ -632,7 +658,7 @@ export async function handleStudentRoutes({
       returnQuery
     );
     const cancelUrl = appendReturnQuery(
-      accountPath(env, "?canceled=1"),
+      accountPath(env, "/canceled"),
       returnQuery
     );
     const mins = enrollment.durationMinutes;

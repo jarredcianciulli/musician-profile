@@ -868,6 +868,7 @@ export default {
         const session = event.data?.object;
         const meta = session?.metadata || {};
         let payload = await readPayload(env);
+        let wrote = false;
 
         if (
           meta.type === "subscription" ||
@@ -880,7 +881,7 @@ export default {
             reason: "expired",
           });
           payload = next;
-          await writePayload(env, payload);
+          wrote = true;
         }
 
         if (meta.type === "trial" || meta.bookingId) {
@@ -889,8 +890,61 @@ export default {
             sessionId: session?.id,
             reason: "expired",
           });
-          if (cancelled) await writePayload(env, next);
+          if (cancelled) {
+            payload = next;
+            wrote = true;
+          }
         }
+
+        // Account portal: clear pending Checkout so Pay can mint a fresh session.
+        if (
+          meta.type === "enrollment_subscription" ||
+          meta.type === "manual_due"
+        ) {
+          const enrollmentId = meta.enrollmentId || "";
+          const sid = session?.id || "";
+          const enrollments = (payload.enrollments || []).map((e) => {
+            if (
+              enrollmentId &&
+              e.id === enrollmentId &&
+              (!sid || e.pendingCheckoutSessionId === sid)
+            ) {
+              return {
+                ...e,
+                pendingCheckoutSessionId: "",
+                pendingCheckoutMode: "",
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            if (!enrollmentId && sid && e.pendingCheckoutSessionId === sid) {
+              return {
+                ...e,
+                pendingCheckoutSessionId: "",
+                pendingCheckoutMode: "",
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            return e;
+          });
+          const payments = (payload.payments || []).map((p) =>
+            p.stripeSessionId === sid && p.status === "pending"
+              ? {
+                  ...p,
+                  status: "cancelled",
+                  cancelledAt: new Date().toISOString(),
+                }
+              : p
+          );
+          payload = {
+            ...payload,
+            enrollments,
+            payments,
+            updatedAt: new Date().toISOString(),
+          };
+          wrote = true;
+        }
+
+        if (wrote) await writePayload(env, payload);
       }
 
       return json({ received: true }, 200, origin);
