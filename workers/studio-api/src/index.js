@@ -371,12 +371,18 @@ function publicStudio(payload) {
   };
 }
 
-/** Bookings + active subscription holds that block calendar slots */
+/** Occupancy only — never attach customer PII (used by public slot generators). */
 function busyBookings(payload) {
   const now = Date.now();
-  const fromBookings = (payload.bookings || []).filter(
-    (b) => b.status !== "cancelled"
-  );
+  const fromBookings = (payload.bookings || [])
+    .filter((b) => b.status !== "cancelled")
+    .map((b) => ({
+      id: b.id,
+      start: b.start,
+      end: b.end,
+      status: b.status,
+      durationMinutes: b.durationMinutes,
+    }));
   const fromReservations = (payload.reservations || [])
     .filter((r) => {
       if (r.status === "active") return true;
@@ -390,13 +396,36 @@ function busyBookings(payload) {
       start: r.start,
       end: r.end,
       status: "reserved",
-      name: r.name || "",
-      email: r.email || "",
-      lessonType: "lesson",
       durationMinutes: r.durationMinutes,
-      createdAt: r.createdAt,
     }));
   return [...fromBookings, ...fromReservations];
+}
+
+/** Public trial success payload — no Stripe ids / notes dump. */
+function publicBookingConfirm(booking) {
+  if (!booking) return null;
+  return {
+    id: booking.id,
+    start: booking.start,
+    end: booking.end,
+    status: booking.status,
+    format: booking.format || "in_person",
+    durationMinutes: booking.durationMinutes,
+    name: booking.name || "",
+  };
+}
+
+/** Public subscription success — only what the success page needs. */
+function publicSubscriptionConfirm(subscription) {
+  if (!subscription) return null;
+  return {
+    id: subscription.id,
+    status: subscription.status,
+    durationMinutes: subscription.durationMinutes,
+    format: subscription.format || "in_person",
+    emailsSentAt: subscription.emailsSentAt || "",
+    emailError: subscription.emailError ? "send_failed" : "",
+  };
 }
 
 function confirmationDetails(env, format) {
@@ -1193,7 +1222,7 @@ export default {
       }
       return json(
         {
-          booking,
+          booking: publicBookingConfirm(booking),
           confirmation:
             booking.status === "scheduled"
               ? confirmationDetails(env, booking.format)
@@ -1258,7 +1287,11 @@ export default {
       if (!subscription) {
         return json({ error: "Subscription not found" }, 404, origin);
       }
-      return json({ subscription }, 200, origin);
+      return json(
+        { subscription: publicSubscriptionConfirm(subscription) },
+        200,
+        origin
+      );
     }
 
     // Legacy direct book (no payment) — disabled when Stripe configured

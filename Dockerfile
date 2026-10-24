@@ -1,10 +1,12 @@
 # Multi-stage Next.js (standalone) — teaching site
-FROM node:20-alpine AS deps
+# Pin patched LTS (Oct 21 2026 Node security releases: Brotli RCE, TLS/DNS).
+# Node 20 is EOL and does not receive those fixes.
+FROM node:24.22.1-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM node:20-alpine AS builder
+FROM node:24.22.1-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -30,7 +32,7 @@ ENV NEXT_PUBLIC_CONTACT_ENDPOINT=$NEXT_PUBLIC_CONTACT_ENDPOINT \
 
 RUN npm run build
 
-FROM node:20-alpine AS runner
+FROM node:24.22.1-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000

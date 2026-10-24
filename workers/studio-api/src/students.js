@@ -259,8 +259,10 @@ export function buildBillingItems(enrollment, payments = [], monthsAhead = 12) {
   return items;
 }
 
+/** Student-portal enrollment — no Stripe IDs or internal hashes. */
 export function publicEnrollment(enrollment) {
   if (!enrollment) return null;
+  const billingMode = enrollment.billingMode || "unset";
   return {
     id: enrollment.id,
     email: enrollment.email,
@@ -271,16 +273,32 @@ export function publicEnrollment(enrollment) {
     format: enrollment.format,
     weekday: enrollment.weekday,
     status: enrollment.status,
-    billingMode: enrollment.billingMode || "unset",
+    billingMode,
     amountDueCents: enrollment.amountDueCents || 0,
     periodKey: enrollment.periodKey || null,
     paidThroughPeriodKey: enrollment.paidThroughPeriodKey || null,
     nextDueAt: enrollment.nextDueAt || null,
-    stripeSubscriptionId: enrollment.stripeSubscriptionId || "",
+    /** True when monthly auto-charge is already on file (no Stripe id leak). */
+    hasAutoBilling: Boolean(
+      billingMode === "auto" && enrollment.stripeSubscriptionId
+    ),
     scheduleMonths: enrollment.scheduleMonths || 12,
     policyAcceptedAt: enrollment.policyAcceptedAt || "",
-    createdAt: enrollment.createdAt,
   };
+}
+
+/** Payment rows for the portal — strip Stripe session / customer ids. */
+export function publicPayments(payments) {
+  return (payments || []).map((p) => ({
+    id: p.id,
+    enrollmentId: p.enrollmentId,
+    kind: p.kind,
+    amountCents: p.amountCents,
+    status: p.status,
+    periodKey: p.periodKey || null,
+    paidAt: p.paidAt || null,
+    createdAt: p.createdAt || null,
+  }));
 }
 
 /**

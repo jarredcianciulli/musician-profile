@@ -349,8 +349,8 @@ const Account: React.FC = () => {
   const { enrollment, billingItems, payments } = data;
   const due = enrollment.amountDueCents || 0;
   const mode = enrollment.billingMode || "manual";
-  const autoReady = mode === "auto" && Boolean(enrollment.stripeSubscriptionId);
-  const showAutoSetup = mode === "auto" && !enrollment.stripeSubscriptionId;
+  const autoReady = mode === "auto" && Boolean(enrollment.hasAutoBilling);
+  const showAutoSetup = mode === "auto" && !enrollment.hasAutoBilling;
   const showManualPay = mode === "manual" || mode === "unset";
   const showChoice = mode === "unset";
   const scheduleBounds = scheduleDateBounds(scheduleRows);

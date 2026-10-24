@@ -163,6 +163,9 @@ export type StudentEnrollment = {
   periodKey?: string | null;
   paidThroughPeriodKey?: string | null;
   nextDueAt?: string | null;
+  /** Portal-safe flag — Stripe subscription id never leaves the API. */
+  hasAutoBilling?: boolean;
+  /** Admin / internal only when present on full enrollment records. */
   stripeSubscriptionId?: string;
   /** How far ahead the portal shows lessons (months). Default 12. */
   scheduleMonths?: number;

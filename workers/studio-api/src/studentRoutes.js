@@ -21,6 +21,7 @@ import {
   buildBillingItems,
   periodKeyFromDate,
   nextMonthStartIso,
+  publicPayments,
 } from "./students.js";
 import { appendReturnQuery, sanitizeReturnQuery } from "./returnQuery.js";
 
@@ -57,7 +58,7 @@ function portalPayload(enrollment, payload) {
     enrollment: publicEnrollment(enrollment),
     schedule,
     billingItems: buildBillingItems(enrollment, payments, months),
-    payments,
+    payments: publicPayments(payments),
   };
 }
 
