@@ -32,6 +32,37 @@
     @apply antialiased overflow-x-hidden bg-paper text-ink font-sans;
   }
 
+  /* No grey tap / focus wash on links & controls (esp. mobile WebKit). */
+  a,
+  button,
+  [role="button"],
+  summary {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  a:focus,
+  a:focus-visible {
+    outline: none;
+    background-color: transparent;
+  }
+
+  button:focus,
+  button:focus-visible,
+  [role="button"]:focus,
+  [role="button"]:focus-visible {
+    outline: none;
+  }
+
+  /* Keyboard-only: light sky ring, no grey fill */
+  a:focus-visible,
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid var(--color-sky-deep);
+    outline-offset: 2px;
+    background-color: transparent;
+  }
+
   /* Prevent iOS Safari zoom-on-focus (needs ≥16px). */
   input,
   select,
@@ -90,6 +121,36 @@
 
   .btn-secondary {
     @apply px-6 py-3 bg-white text-ink font-semibold rounded-sm border border-ink hover:bg-paper-muted transition-colors duration-200;
+  }
+
+  .btn-primary:disabled,
+  .btn-primary[disabled],
+  .btn-primary[aria-disabled="true"],
+  .btn-secondary:disabled,
+  .btn-secondary[disabled],
+  .btn-secondary[aria-disabled="true"] {
+    background-color: var(--color-paper-muted);
+    color: var(--color-muted);
+    border-color: var(--color-line);
+    cursor: not-allowed;
+    opacity: 1;
+    box-shadow: none;
+  }
+
+  .btn-primary:disabled:hover,
+  .btn-primary[disabled]:hover,
+  .btn-primary[aria-disabled="true"]:hover,
+  .btn-secondary:disabled:hover,
+  .btn-secondary[disabled]:hover,
+  .btn-secondary[aria-disabled="true"]:hover {
+    background-color: var(--color-paper-muted);
+    color: var(--color-muted);
+  }
+
+  .btn-primary:focus-visible,
+  .btn-secondary:focus-visible {
+    outline: 2px solid var(--color-sky-deep);
+    outline-offset: 2px;
   }
 
   .section-container {
