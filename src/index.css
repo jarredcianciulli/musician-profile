@@ -37,6 +37,45 @@
   select,
   textarea {
     font-size: 16px;
+    color: var(--color-ink);
+    background-color: var(--color-paper);
+  }
+
+  /*
+    Kill Chrome / Safari / Edge / iOS autofill yellow (and similar washes).
+    Inset shadow + long transition is the reliable cross-browser override.
+  */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus,
+  textarea:-webkit-autofill:active,
+  select:-webkit-autofill,
+  select:-webkit-autofill:hover,
+  select:-webkit-autofill:focus,
+  select:-webkit-autofill:active {
+    -webkit-text-fill-color: var(--color-ink) !important;
+    caret-color: var(--color-ink);
+    border-color: var(--color-line);
+    box-shadow: 0 0 0 1000px var(--color-paper) inset !important;
+    transition: background-color 99999s ease-out 0s;
+  }
+
+  input:autofill,
+  input:autofill:hover,
+  input:autofill:focus,
+  textarea:autofill,
+  textarea:autofill:hover,
+  textarea:autofill:focus,
+  select:autofill,
+  select:autofill:hover,
+  select:autofill:focus {
+    background-color: var(--color-paper) !important;
+    color: var(--color-ink) !important;
+    box-shadow: 0 0 0 1000px var(--color-paper) inset !important;
   }
 
   #root {
@@ -59,6 +98,15 @@
 
   .admin-input {
     @apply w-full border border-line bg-paper px-3 py-2 text-base text-ink focus:outline-none focus:border-sky-deep;
+  }
+
+  .admin-input:-webkit-autofill,
+  .admin-input:-webkit-autofill:hover,
+  .admin-input:-webkit-autofill:focus,
+  .admin-input:-webkit-autofill:active {
+    -webkit-text-fill-color: var(--color-ink) !important;
+    caret-color: var(--color-ink);
+    box-shadow: 0 0 0 1000px var(--color-paper) inset !important;
   }
 }
 
