@@ -32,6 +32,23 @@ export function formatSlotDay(iso: string, timeZone: string): string {
   }).format(new Date(iso));
 }
 
+/** Weekday only, e.g. "Fri" */
+export function formatSlotWeekday(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+  }).format(new Date(iso));
+}
+
+/** Month + day only, e.g. "Oct 30" */
+export function formatSlotMonthDay(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    month: "short",
+    day: "numeric",
+  }).format(new Date(iso));
+}
+
 export function formatSlotTime(iso: string, timeZone: string): string {
   return new Intl.DateTimeFormat("en-US", {
     timeZone,

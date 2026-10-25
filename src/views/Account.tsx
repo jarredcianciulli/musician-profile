@@ -23,7 +23,12 @@ import {
   SCHEDULE_PAGE_SIZE,
   type ScheduleKindFilter,
 } from "../lib/accountScheduleFilters";
-import { formatSlotDay, formatSlotTime } from "../lib/slots";
+import {
+  formatSlotDay,
+  formatSlotMonthDay,
+  formatSlotTime,
+  formatSlotWeekday,
+} from "../lib/slots";
 import { marketingSiteUrl, studioEmail } from "../lib/env";
 import { collectReturnQuery } from "../lib/returnQuery";
 import StudioPolicyBody from "../components/StudioPolicyBody";
@@ -187,6 +192,18 @@ const Account: React.FC = () => {
         })),
     [scheduleRows, dateFrom, dateTo]
   );
+
+  const nextLessonStart = useMemo(() => {
+    const now = Date.now() - 5 * 60 * 1000;
+    const upcoming = (scheduleRows || []).find(
+      (row) =>
+        (row.type === "lesson" || row.type === "trial") &&
+        row.status !== "completed" &&
+        row.start &&
+        new Date(row.start).getTime() >= now
+    );
+    return upcoming?.start || null;
+  }, [scheduleRows]);
 
   useEffect(() => {
     let cancelled = false;
@@ -524,8 +541,16 @@ const Account: React.FC = () => {
                   Weekly time
                 </dt>
                 <dd>
-                  {formatSlotDay(enrollment.slotStart, TZ)} ·{" "}
-                  {formatSlotTime(enrollment.slotStart, TZ)}
+                  <span>
+                    {formatSlotWeekday(enrollment.slotStart, TZ)} ·{" "}
+                    {formatSlotTime(enrollment.slotStart, TZ)}
+                  </span>
+                  {nextLessonStart ? (
+                    <span className="block text-xs text-muted mt-0.5">
+                      Next lesson — {formatSlotMonthDay(nextLessonStart, TZ)} ·{" "}
+                      {formatSlotTime(nextLessonStart, TZ)}
+                    </span>
+                  ) : null}
                 </dd>
               </div>
               <div>
