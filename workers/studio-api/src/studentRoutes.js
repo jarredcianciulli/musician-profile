@@ -29,6 +29,7 @@ import {
   buildSchedule,
   mergeScheduleWithBookings,
   buildBillingItems,
+  buildTrialBillingItems,
   periodKeyFromDate,
   nextMonthStartIso,
   publicPayments,
@@ -81,10 +82,16 @@ function portalPayload(enrollment, payload) {
         p.status !== "canceled"
     )
     .slice(0, 40);
+  const trialBilling = buildTrialBillingItems(
+    enrollment,
+    payments,
+    payload.bookings || []
+  );
+  const monthlyBilling = buildBillingItems(enrollment, payments, months);
   return {
     enrollment: publicEnrollment(enrollment),
     schedule,
-    billingItems: buildBillingItems(enrollment, payments, months),
+    billingItems: [...trialBilling, ...monthlyBilling],
     payments: publicPayments(payments),
     proration: publicProrationSummary(
       enrollment,

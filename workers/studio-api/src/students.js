@@ -250,8 +250,82 @@ export function upcomingLessons(enrollment, holidays = [], count = 8) {
 const MONTHLY_RATES = { 30: 16000, 45: 22000, 60: 31000 };
 
 /**
+ * Trial lesson rows for the billing table (paid, due, or waived / $0).
+ */
+export function buildTrialBillingItems(enrollment, payments = [], bookings = []) {
+  if (!enrollment?.id) return [];
+  const items = [];
+  const seenBooking = new Set();
+
+  for (const p of payments || []) {
+    if (p.kind !== "trial") continue;
+    if (p.status === "cancelled" || p.status === "canceled") continue;
+    const waived =
+      p.note === "waived" ||
+      (Number(p.amountCents) === 0 && p.status === "paid");
+    if (p.bookingId) seenBooking.add(p.bookingId);
+    const when = p.paidAt || p.createdAt || "";
+    items.push({
+      periodKey: when ? String(when).slice(0, 10) : "trial",
+      label: waived ? "Trial lesson (waived)" : "Trial lesson",
+      amountCents: typeof p.amountCents === "number" ? p.amountCents : 0,
+      status: waived
+        ? "waived"
+        : p.status === "paid"
+          ? "paid"
+          : "due",
+      paidAt: p.paidAt || null,
+      kind: "trial",
+      note: p.note || (waived ? "waived" : ""),
+    });
+  }
+
+  for (const b of bookings || []) {
+    if (!b || b.lessonType !== "trial") continue;
+    if (b.status === "cancelled") continue;
+    const linked =
+      b.enrollmentId === enrollment.id ||
+      b.id === enrollment.trialBookingId ||
+      ((b.email || "").toLowerCase() ===
+        (enrollment.email || "").toLowerCase() &&
+        !b.enrollmentId);
+    if (!linked) continue;
+    if (b.id && seenBooking.has(b.id)) continue;
+    const waived =
+      Boolean(enrollment.trialWaived) ||
+      String(b.notes || "").includes("waived") ||
+      (typeof b.amountCents === "number" &&
+        b.amountCents === 0 &&
+        b.status !== "pending_payment");
+    const amountCents =
+      typeof b.amountCents === "number" ? b.amountCents : waived ? 0 : 0;
+    items.push({
+      periodKey: b.start ? String(b.start).slice(0, 10) : "trial",
+      label: waived ? "Trial lesson (waived)" : "Trial lesson",
+      amountCents,
+      status:
+        b.status === "pending_payment"
+          ? "due"
+          : waived
+            ? "waived"
+            : b.paidAt || b.status === "scheduled" || b.status === "completed"
+              ? "paid"
+              : "due",
+      paidAt: b.paidAt || null,
+      kind: "trial",
+      note: waived ? "waived" : "",
+    });
+  }
+
+  items.sort((a, b) =>
+    String(b.periodKey || "").localeCompare(String(a.periodKey || ""))
+  );
+  return items;
+}
+
+/**
  * Read-only billing line items for the portal.
- * status: paid | due | upcoming
+ * status: paid | due | upcoming | waived
  */
 export function buildBillingItems(enrollment, payments = [], monthsAhead = 12) {
   const rates = MONTHLY_RATES;
@@ -399,6 +473,8 @@ export function publicPayments(payments) {
     periodKey: p.periodKey || null,
     paidAt: p.paidAt || null,
     createdAt: p.createdAt || null,
+    note: p.note || null,
+    bookingId: p.bookingId || null,
   }));
 }
 

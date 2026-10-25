@@ -51,6 +51,8 @@ function statusLabel(status: string) {
       return "Completed";
     case "pending_payment":
       return "Payment pending";
+    case "waived":
+      return "Waived";
     case "holiday":
       return "Holiday";
     case "break":
@@ -962,9 +964,9 @@ const Account: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {billingRows.map((item) => (
+                {billingRows.map((item, idx) => (
                   <tr
-                    key={item.periodKey}
+                    key={`${item.kind || "bill"}-${item.periodKey}-${idx}`}
                     className={`border-b border-line/70 last:border-0 ${
                       item.status === "due" ? "bg-paper-muted/50" : ""
                     }`}
@@ -974,7 +976,12 @@ const Account: React.FC = () => {
                     </td>
                     <td className="px-3 py-2 text-ink-soft">{item.label}</td>
                     <td className="px-3 py-2">
-                      {formatMoney(item.amountCents)}
+                      {item.status === "waived" ||
+                      (item.kind === "trial" &&
+                        item.amountCents === 0 &&
+                        item.note === "waived")
+                        ? "$0"
+                        : formatMoney(item.amountCents)}
                     </td>
                     <td className="px-3 py-2">{statusLabel(item.status)}</td>
                   </tr>
@@ -992,24 +999,33 @@ const Account: React.FC = () => {
             {payments
               .filter((p) => p.status === "paid")
               .slice(0, 12)
-              .map((p) => (
-                <li
-                  key={p.id}
-                  className="px-4 py-2.5 flex justify-between gap-2"
-                >
-                  <span className="text-ink-soft">
-                    {p.kind === "trial"
-                      ? "Trial lesson"
-                      : p.kind === "proration"
-                        ? "First period"
-                        : p.kind === "monthly"
-                          ? "Monthly tuition"
-                          : p.kind}
-                    {p.periodKey ? ` · ${p.periodKey}` : ""}
-                  </span>
-                  <span>{formatMoney(p.amountCents)}</span>
-                </li>
-              ))}
+              .map((p) => {
+                const waived =
+                  p.note === "waived" ||
+                  (p.kind === "trial" && (p.amountCents || 0) === 0);
+                return (
+                  <li
+                    key={p.id}
+                    className="px-4 py-2.5 flex justify-between gap-2"
+                  >
+                    <span className="text-ink-soft">
+                      {p.kind === "trial"
+                        ? waived
+                          ? "Trial lesson (waived)"
+                          : "Trial lesson"
+                        : p.kind === "proration"
+                          ? "First period"
+                          : p.kind === "monthly"
+                            ? "Monthly tuition"
+                            : p.kind}
+                      {p.periodKey ? ` · ${p.periodKey}` : ""}
+                    </span>
+                    <span>
+                      {waived ? "$0 · Waived" : formatMoney(p.amountCents)}
+                    </span>
+                  </li>
+                );
+              })}
           </ul>
         </section>
       ) : null}

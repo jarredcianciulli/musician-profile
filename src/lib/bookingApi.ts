@@ -337,8 +337,10 @@ export type AccountBillingItem = {
   periodKey: string;
   label: string;
   amountCents: number;
-  status: "paid" | "due" | "upcoming" | string;
+  status: "paid" | "due" | "upcoming" | "waived" | string;
   paidAt?: string | null;
+  kind?: string;
+  note?: string | null;
 };
 
 export type AccountProrationSummary = {
